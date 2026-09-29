@@ -41,6 +41,9 @@ configuracion(clpfd, [heuristica(ff),       simetria(si)],    'CLP(FD), ff+sim')
 configuracion(clpfd, [heuristica(ffc),      simetria(si)],    'CLP(FD), ffc+sim').
 configuracion(clpfd, [heuristica(lcv),      simetria(si)],    'CLP(FD), lcv+sim').
 configuracion(clpfd, [heuristica(ff),       optimizar],       'CLP(FD), ff + B&B').
+configuracion(clpfd, [heuristica(original), labeling(fd)], 'CLP(FD) fd_labeling, original').
+configuracion(clpfd, [heuristica(ff),       labeling(fd)], 'CLP(FD) fd_labeling, ff').
+configuracion(clpfd, [heuristica(ffc),      labeling(fd)], 'CLP(FD) fd_labeling, ffc').
 
 % ------------------------------------------------------------
 % Interfaz
