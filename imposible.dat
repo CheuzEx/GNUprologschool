@@ -1,0 +1,19 @@
+# Sin solucion por busqueda: 1 aula, 1 franja, 1 dia, dos grupos excluyentes
+#:CONFIG
+dias;L
+franjas;1
+inicio;07:00
+duracion_franja;60
+#:AULA
+A-1;30;teoria
+#:PROFESOR
+P-1;Ana;10;
+P-2;Luis;10;
+#:CURSO
+X-1;Curso X;C1;20;1;1;teoria
+Y-1;Curso Y;C1;20;1;1;teoria
+#:IMPARTE
+X-1;C1;P-1
+Y-1;C1;P-2
+#:RESTRICCION
+excluyentes;X-1;C1;Y-1;C1
