@@ -12,6 +12,13 @@
 %
 % Opciones: heuristica(original|grado|demanda|mrv|ff|ffc|lcv)
 %           simetria(no|si|intra|inter)   limite(N)   optimizar
+%           labeling(propio|fd)   (por defecto propio)
+%             propio : etiquetado propio; cuenta nodos y respeta limite(N).
+%             fd     : fd_labeling/2 de GNU Prolog (8.2/8.3). NO respeta
+%                      limite(N) ni cuenta nodos (nodos queda en 0); solo
+%                      registra los retrocesos con la opcion backtracks(B).
+%                      Con optimizar se ignora: el B&B siempre usa el
+%                      etiquetado propio (necesita la cota inferior).
 %
 % NOTAS
 %  - GNU Prolog trae el solver FD incorporado: NO hay que importar
@@ -52,7 +59,9 @@
 %                            una variable por sesion, su tamano ES el
 %                            numero de valores restantes: ff == MRV.
 %   ffc                    : ff con desempate por grado (las sesiones se
-%                            reordenan por grado antes de etiquetar)
+%                            reordenan por grado antes de etiquetar; con
+%                            labeling(fd) el desempate lo hace GNU Prolog
+%                            por numero de restricciones de la variable)
 %   lcv                    : ff + valor menos restrictivo: se prueba cada
 %                            valor propagando y se elige el que deja mas
 %                            valores en las demas sesiones.
@@ -66,6 +75,7 @@
 buscar_fd(Opc, Pares0, Sol) :-
     opcion(heuristica, Opc, original, H),
     opcion(simetria,   Opc, no,       Sim),
+    opcion(labeling,   Opc, propio,   ModoLab),
     g_assign(opt_optimo, n_a),
     orden_previo(H, Pares0, Pares),
     preparar_indices,
@@ -76,9 +86,39 @@ buscar_fd(Opc, Pares0, Sol) :-
     (   member(optimizar, Opc)
     ->  buscar_optimo(Vars, Pares, MV, MVal, Sol)
     ;   xs_de(Vars, Xs),
-        etiquetar(Xs, MV, MVal, none),
+        etiquetar_segun(ModoLab, H, Xs, MV, MVal, none),
         reconstruir(Pares, Vars, Sol)
     ).
+
+% etiquetar_segun(+Modo, +Heuristica, +Xs, +MV, +MVal, +Poda)
+etiquetar_segun(propio, _H, Xs, MV, MVal, Poda) :- !,
+    etiquetar(Xs, MV, MVal, Poda).
+etiquetar_segun(fd, H, Xs, _MV, _MVal, _Poda) :- !,
+    fd_labeling_opts(H, Opts),
+    % backtracks(B) es de SALIDA: unifica B con los retrocesos ocurridos.
+    % No sirve como limite (fd_labeling/2 no tiene opcion de limite).
+    fd_labeling(Xs, [backtracks(B)|Opts]),
+    g_assign(retrocesos, B).
+etiquetar_segun(Otro, _, _, _, _, _) :-
+    throw(error_argumentos(labeling(Otro))).
+
+% fd_labeling_opts(+Heuristica, -Opciones)
+% Equivalencia con las opciones de fd_labeling/2 (justificar en el informe):
+%   original : leftmost + up (valores por defecto)
+%   mrv, ff  : ff (menor dominio; con una variable por sesion, el tamano
+%              del dominio ES el numero de valores restantes: ff == MRV)
+%   ffc      : ff con desempate por la variable con mas restricciones
+%   grado, demanda : el orden lo fija ordenar/3 antes de buscar; el
+%              etiquetado es leftmost sobre esa lista (aproximacion)
+%   lcv      : GNU Prolog no lo expone; solo existe en etiquetado propio
+fd_labeling_opts(original, []) :- !.
+fd_labeling_opts(grado,    []) :- !.
+fd_labeling_opts(demanda,  []) :- !.
+fd_labeling_opts(mrv,      [ff]) :- !.
+fd_labeling_opts(ff,       [ff]) :- !.
+fd_labeling_opts(ffc,      [ffc]) :- !.
+fd_labeling_opts(H, _) :-
+    throw(error_argumentos(labeling_fd(H))).
 
 orden_previo(ffc, P, P2) :- !, ordenar(grado, P, P2).
 orden_previo(_, P, P).
