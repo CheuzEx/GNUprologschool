@@ -19,6 +19,7 @@ if [ $# -lt 3 ]; then
     echo "  --optimizar" >&2
     echo "  --por-aula" >&2
     echo "  --salida-prolog=RUTA" >&2
+    echo "  --labeling=fd|propio  (default: propio)" >&2
     exit 4
 fi
 
@@ -40,6 +41,8 @@ for arg in "$@"; do
         --por-aula)         OPCIONES="$OPCIONES,por_aula" ;;
         --salida-prolog=*)  R=${arg#--salida-prolog=}
                             OPCIONES="$OPCIONES,salida_prolog('$R')" ;;
+        --labeling=*)       LB=${arg#--labeling=}
+                            OPCIONES="$OPCIONES,labeling($LB)" ;;   # NUEVO
         *)  echo "Opcion desconocida: $arg" >&2; exit 4 ;;
     esac
 done
