@@ -1,0 +1,89 @@
+# Instancia grande: Campus Norte, periodo 2026-1
+#:CONFIG
+dias;L,M,X,J,V
+franjas;8
+inicio;07:00
+duracion_franja;60
+
+#:AULA
+A-101;45;teoria
+A-102;40;teoria
+A-103;35;teoria
+A-201;50;teoria
+A-202;45;teoria
+A-203;30;mixta
+LAB-1;25;laboratorio
+LAB-2;30;laboratorio
+LAB-3;20;mixta
+
+#:PROFESOR
+P-001;Ana Rojas;24;L1-L8,M1-M8,X1-X8,J1-J8
+P-002;Luis Mora;20;
+P-003;Carmen Diaz;20;L1-L6,X1-X6,J1-J6
+P-004;Jorge Solis;24;
+P-005;Laura Vega;18;M1-M8,X1-X8,V1-V8
+P-006;Pedro Castro;20;L1-L8,M1-M8,J1-J8
+P-007;Maria Perez;16;L1-L4,M1-M8,X1-X8
+P-008;Diego Ruiz;20;
+P-009;Sofia Chaves;18;L1-L6,X1-X6,V1-V6
+P-010;Carlos Mora;20;M1-M8,J1-J8,V1-V8
+
+#:CURSO
+IC-1001;Programacion I;C1;40;2;2;teoria
+IC-1001;Programacion I;C2;35;2;2;teoria
+IC-1002;Programacion II;C1;38;2;2;teoria
+IC-1003;Estructuras de Datos;C1;30;2;2;mixta
+IC-1004;Bases de Datos;C1;45;2;2;teoria
+IC-1005;Sistemas Operativos;C1;40;2;2;teoria
+IC-1006;Redes;C1;35;2;2;mixta
+IC-1007;Arquitectura de Computadores;C1;30;2;2;teoria
+IC-1008;Ingenieria de Software;C1;45;2;2;teoria
+IC-1009;Calidad de Software;C1;25;2;2;teoria
+IC-1010;Compiladores;C1;20;2;2;mixta
+IC-1011;Seguridad Informatica;C1;28;2;2;mixta
+MA-1001;Calculo I;C1;45;3;1;teoria
+MA-1002;Calculo II;C1;40;2;1;teoria
+MA-1003;Algebra Lineal;C1;35;2;1;teoria
+MA-1004;Matematica Discreta;C1;40;2;1;teoria
+FI-1001;Fisica I;C1;35;2;2;teoria
+FI-1002;Fisica II;C1;30;2;2;teoria
+LAB-2001;Laboratorio de Programacion;C1;20;1;3;laboratorio
+LAB-2002;Laboratorio de Redes;C1;25;1;3;laboratorio
+LAB-2003;Laboratorio de Bases de Datos;C1;25;1;2;laboratorio
+
+#:IMPARTE
+IC-1001;C1;P-001
+IC-1001;C2;P-002
+IC-1002;C1;P-003
+IC-1003;C1;P-004
+IC-1004;C1;P-005
+IC-1005;C1;P-006
+IC-1006;C1;P-007
+IC-1007;C1;P-008
+IC-1008;C1;P-009
+IC-1009;C1;P-010
+IC-1010;C1;P-003
+IC-1011;C1;P-004
+MA-1001;C1;P-001
+MA-1002;C1;P-002
+MA-1003;C1;P-005
+MA-1004;C1;P-006
+FI-1001;C1;P-007
+FI-1002;C1;P-008
+LAB-2001;C1;P-009
+LAB-2002;C1;P-010
+LAB-2003;C1;P-004
+
+#:RESTRICCION
+aula_fija;LAB-2001;C1;LAB-1
+aula_fija;LAB-2002;C1;LAB-2
+prohibida;MA-1001;C1;V8
+prohibida;IC-1005;C1;L1
+prohibida;IC-1008;C1;M8
+prohibida;LAB-2003;C1;V1
+excluyentes;IC-1001;C1;IC-1002;C1
+excluyentes;IC-1004;C1;IC-1008;C1
+prefiere;IC-1001;C1;L1;3
+prefiere;MA-1001;C1;M2;2
+compacta;IC-1003;C1;5
+compacta;IC-1008;C1;4
