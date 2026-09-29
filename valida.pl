@@ -29,8 +29,7 @@ validar_lineas(Lineas, Errores) :-
     validar_cobertura_imparte(Registros, ErroresImp),
     append([ErroresEstruct, ErroresSecc, ErroresConfig, ErroresDatos,
             ErroresDup, ErroresImp], Todos),
-    append(Todos, Errores0),
-    sort(Errores0, Errores).
+    sort(Todos, Errores).
 
 % ------------------------------------------------------------
 % Pase 1: recolectar registros y errores estructurales
