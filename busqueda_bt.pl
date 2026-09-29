@@ -2,17 +2,29 @@
 % busqueda_bt.pl -- Fase 2: sesiones, dominios, verificacion y
 % estrategias de backtracking.
 %
-% Se carga despues de horarios.pl (usa sus hechos dinamicos):
-%     :- include('busqueda_bt.pl').
+% Se carga despues de horarios.pl (usa sus hechos dinamicos).
 %
-% Estrategias:
+% Estrategias (buscar/4):
 %   bt_gp : generar y probar (linea base, sin ninguna poda)
 %   bt    : verificacion anticipada. Opciones:
-%             heuristica(original | grado | demanda | mrv)
-%             simetria(si | no)
+%             heuristica(original | grado | demanda | mrv | lcv)
+%             simetria(no | si | intra | inter)      (por defecto no)
 %             limite(N)            (maximo de nodos, por defecto 1000000)
+%           original/grado/demanda: orden estatico de variables.
 %           mrv = forward checking + minimum remaining values
-%           (desempate por grado).
+%                 (desempate por grado).
+%           lcv = forward checking + orden estatico de variables +
+%                 valor menos restrictivo (least constraining value).
+%           Cualquier otra heuristica (ff, ffc, ...) es el orden original.
+%   clpfd : delega en buscar_fd/4 (definido en busqueda_fd.pl).
+%
+% Reduccion de simetria (opcion simetria):
+%   intra : las sesiones de un mismo grupo se ordenan en el tiempo
+%           (la de indice menor va antes).
+%   inter : para grupos EQUIVALENTES (mismo profesor, inscritos,
+%           sesiones, duracion y tipo, y sin restricciones declaradas)
+%           se fija el orden de sus primeras sesiones.
+%   si    : intra + inter.
 %
 % Resultado de resolver/3:
 %   solucion(Horario) | sin_solucion(Razon) | limite_alcanzado
@@ -21,15 +33,19 @@
 % ============================================================
 
 :- dynamic(pos_dia/2).
+:- dynamic(equiv_g/4).       % equiv_g(C1,G1,C2,G2): grupos equivalentes, C1-G1 @< C2-G2
 
 % ------------------------------------------------------------
 % Preparacion: posicion cronologica de cada dia (l=1, m=2, ...)
+% y grupos equivalentes (para la simetria entre grupos)
 % ------------------------------------------------------------
 
 preparar :-
     retractall(pos_dia(_, _)),
+    retractall(equiv_g(_, _, _, _)),
     findall(D, dia(D), Dias),
-    numerar_dias(Dias, 1).
+    numerar_dias(Dias, 1),
+    preparar_equivalencias.
 
 numerar_dias([], _).
 numerar_dias([D|Ds], K) :-
@@ -40,6 +56,31 @@ numerar_dias([D|Ds], K) :-
 tiempo(D, F, T) :-
     pos_dia(D, K),
     T is K * 1000 + F.
+
+preparar_equivalencias :-
+    findall(C-G, grupo(C, G, _, _, _, _, _), Gs),
+    forall(( member(C1-G1, Gs), member(C2-G2, Gs),
+             C1-G1 @< C2-G2,
+             grupos_equivalentes(C1, G1, C2, G2) ),
+           assertz(equiv_g(C1, G1, C2, G2))).
+
+% Intercambiar por completo los horarios de dos grupos equivalentes
+% produce otra solucion valida y del mismo costo.
+grupos_equivalentes(C1, G1, C2, G2) :-
+    grupo(C1, G1, _, Insc, Sem, Dur, Req),
+    grupo(C2, G2, _, Insc, Sem, Dur, Req),
+    profesor_de(C1, G1, P),
+    profesor_de(C2, G2, P),
+    sin_declaraciones(C1, G1),
+    sin_declaraciones(C2, G2).
+
+sin_declaraciones(C, G) :-
+    \+ aula_fija(C, G, _),
+    \+ prohibida(C, G, _, _),
+    \+ excluyentes(C, G, _, _),
+    \+ excluyentes(_, _, C, G),
+    \+ prefiere(C, G, _, _, _),
+    \+ compacta(C, G, _).
 
 % ------------------------------------------------------------
 % sesiones(-Lista)
@@ -74,6 +115,8 @@ profesor_de(C, G, P) :-
 % Lista de v(Aula, Dia, FranjaInicio) que ya cumplen: capacidad, tipo,
 % aula_fija, prohibida y disponibilidad del profesor en TODAS las
 % franjas que cubre la sesion (mas estricto que "en la franja de inicio").
+% El maximo de franjas del profesor no depende de la asignacion (la carga
+% es constante), por eso se comprueba en diagnostico_previo/2 y verifica/1.
 % ------------------------------------------------------------
 
 dominio(sesion(_, C, G, _, P, Dur), Dominio) :-
@@ -144,19 +187,41 @@ excluyentes_par(C1, G1, C2, G2) :-
     ),
     !.
 
-% Ruptura de simetria: las sesiones de un mismo grupo son intercambiables,
-% asi que se exige que la de indice menor vaya antes en el tiempo.
-% (No es una restriccion del problema: verifica/1 NO la exige.)
-rompe_simetria(sesion(_, C, G, I1, _, _), v(_, D1, F1),
-               sesion(_, C, G, I2, _, _), v(_, D2, F2)) :-
+% ------------------------------------------------------------
+% Rupturas de simetria (no son restricciones del problema:
+% verifica/1 NO las exige)
+% ------------------------------------------------------------
+
+% Mecanismo 1 (intra-grupo): las sesiones de un mismo grupo son
+% intercambiables, asi que la de indice menor va antes en el tiempo.
+rompe_intra(sesion(_, C, G, I1, _, _), v(_, D1, F1),
+            sesion(_, C, G, I2, _, _), v(_, D2, F2)) :-
     I1 \== I2,
     tiempo(D1, F1, T1),
     tiempo(D2, F2, T2),
     (   I1 < I2 -> T1 >= T2 ; T1 =< T2 ).
 
+% Mecanismo 2 (inter-grupo): dos grupos equivalentes (equiv_g/4) se pueden
+% intercambiar enteros; se fija que la primera sesion del grupo menor
+% (en orden de terminos) vaya antes que la del otro. Comparten profesor,
+% asi que nunca coinciden en el tiempo.
+rompe_inter(sesion(_, C1, G1, 1, _, _), v(_, D1, F1),
+            sesion(_, C2, G2, 1, _, _), v(_, D2, F2)) :-
+    tiempo(D1, F1, T1),
+    tiempo(D2, F2, T2),
+    (   equiv_g(C1, G1, C2, G2) -> T1 >= T2
+    ;   equiv_g(C2, G2, C1, G1), T2 >= T1
+    ).
+
+sim_intra(si).
+sim_intra(intra).
+sim_inter(si).
+sim_inter(inter).
+
 inconsistente(Sim, S1, V1, S2, V2) :-
     (   incompatibles(S1, V1, S2, V2)
-    ;   Sim == si, rompe_simetria(S1, V1, S2, V2)
+    ;   sim_intra(Sim), rompe_intra(S1, V1, S2, V2)
+    ;   sim_inter(Sim), rompe_inter(S1, V1, S2, V2)
     ),
     !.
 
@@ -187,26 +252,34 @@ elegir(V, Dom) :-
     ).
 
 % ------------------------------------------------------------
-% Estrategia 1: generar y probar
-% Asigna TODAS las sesiones y solo entonces verifica con verifica/1.
+% buscar(+Estrategia, +Opciones, +Pares, -Solucion)
+% Unico punto de entrada; busqueda_fd.pl aporta buscar_fd/4.
 % ------------------------------------------------------------
 
-buscar(bt_gp, _Opc, Pares, Sol) :-
+% Estrategia 1: generar y probar
+% Asigna TODAS las sesiones y solo entonces verifica con verifica/1.
+buscar(bt_gp, _Opc, Pares, Sol) :- !,
     generar(Pares, Sol),
     a_horario(Sol, Horario),
     verifica(Horario).
 
-% ------------------------------------------------------------
 % Estrategia 2: verificacion anticipada
-% ------------------------------------------------------------
-
-buscar(bt, Opc, Pares, Sol) :-
+buscar(bt, Opc, Pares, Sol) :- !,
     opcion(heuristica, Opc, original, H),
-    opcion(simetria, Opc, si, Sim),
+    opcion(simetria, Opc, no, Sim),
     (   H == mrv
-    ->  buscar_fc(Pares, Sim, Sol)
+    ->  buscar_fc(Pares, Sim, mrv, orig, Sol)
+    ;   H == lcv
+    ->  buscar_fc(Pares, Sim, estatico, lcv, Sol)
     ;   buscar_anticipada(Pares, Sim, [], Sol)
     ).
+
+% Estrategia 3: dominios finitos (busqueda_fd.pl)
+buscar(clpfd, Opc, Pares, Sol) :- !,
+    buscar_fd(Opc, Pares, Sol).
+
+buscar(E, _, _, _) :-
+    throw(error_argumentos(estrategia(E))).
 
 generar([], []).
 generar([S-Dom|Resto], [S-V|Asig]) :-
@@ -220,14 +293,20 @@ buscar_anticipada([S-Dom|Resto], Sim, Prev, [S-V|Asig]) :-
     \+ ( member(S2-V2, Prev), inconsistente(Sim, S, V, S2, V2) ),
     buscar_anticipada(Resto, Sim, [S-V|Prev], Asig).
 
-% Forward checking + MRV: tras cada asignacion se podan los dominios de las
+% Forward checking: tras cada asignacion se podan los dominios de las
 % sesiones pendientes; si alguno queda vacio se retrocede de inmediato.
-buscar_fc([], _, []).
-buscar_fc([P|Ps], Sim, [S-V|Asig]) :-
-    seleccionar_mrv([P|Ps], S-Dom, Resto),
-    elegir(V, Dom),
+%   VarSel : mrv (menor dominio) | estatico (primera de la lista)
+%   ValSel : orig (orden del dominio) | lcv (menos restrictivo primero)
+buscar_fc([], _, _, _, []).
+buscar_fc([P|Ps], Sim, VarSel, ValSel, [S-V|Asig]) :-
+    seleccionar(VarSel, [P|Ps], S-Dom, Resto),
+    ordenar_valores(ValSel, Dom, S, Resto, Sim, DomOrd),
+    elegir(V, DomOrd),
     filtrar(Resto, S, V, Sim, Resto2),
-    buscar_fc(Resto2, Sim, Asig).
+    buscar_fc(Resto2, Sim, VarSel, ValSel, Asig).
+
+seleccionar(mrv, Ps, Mejor, Resto) :- seleccionar_mrv(Ps, Mejor, Resto).
+seleccionar(estatico, [P|Ps], P, Ps).
 
 seleccionar_mrv([P|Ps], Mejor, Resto) :-
     P = _-Dom,
@@ -248,6 +327,27 @@ quitar_par(S-_, [S2-D2|Ps], Resto) :-
     ;   Resto = [S2-D2|R], quitar_par(S-_, Ps, R)
     ).
 
+% Orden de valores. lcv: primero el valor que descarta MENOS valores de
+% los dominios de las sesiones pendientes (keysort es estable).
+ordenar_valores(orig, Dom, _, _, _, Dom) :- !.
+ordenar_valores(lcv, Dom, S, Resto, Sim, DomOrd) :-
+    findall(K-W,
+            (   member(W, Dom),
+                descartados(W, S, Resto, Sim, K)
+            ),
+            Claves),
+    keysort(Claves, Ord),
+    valores(Ord, DomOrd).
+
+descartados(W, S, Resto, Sim, K) :-
+    findall(x,
+            (   member(T-DomT, Resto),
+                member(X, DomT),
+                inconsistente(Sim, S, W, T, X)
+            ),
+            L),
+    length(L, K).
+
 filtrar([], _, _, _, []).
 filtrar([T-Dom|Resto], S, V, Sim, [T-Dom2|Resto2]) :-
     filtrar_dominio(Dom, S, V, T, Sim, Dom2),
@@ -267,8 +367,16 @@ filtrar_dominio([W|Ws], S, V, T, Sim, Dom2) :-
 
 ordenar(original, Pares, Pares) :- !.
 ordenar(mrv, Pares, Ordenados) :- !,      % el orden inicial desempata por grado
-    ordenar(grado, Pares, Ordenados).
-ordenar(Criterio, Pares, Ordenados) :-
+    ordenar_por(grado, Pares, Ordenados).
+ordenar(grado, Pares, Ordenados) :- !,
+    ordenar_por(grado, Pares, Ordenados).
+ordenar(demanda, Pares, Ordenados) :- !,
+    ordenar_por(demanda, Pares, Ordenados).
+% CORREGIDO: cualquier otra heuristica (ff, ffc, lcv, ...) conserva el
+% orden original. Antes faltaba esta clausula y ordenar/3 fallaba.
+ordenar(_, Pares, Pares).
+
+ordenar_por(Criterio, Pares, Ordenados) :-
     sesiones_de_pares(Pares, Todas),
     claves(Pares, Criterio, Todas, Claves),
     keysort(Claves, Ord0),
@@ -345,18 +453,60 @@ pares_con_dominio([S|Ss], [S-Dom|Ps]) :-
     dominio(S, Dom),
     pares_con_dominio(Ss, Ps).
 
-% Razones por las que es imposible sin buscar nada
+% ------------------------------------------------------------
+% Razones por las que la instancia es imposible sin buscar nada
+% (inconsistencia por construccion, seccion 11.3). Primero las
+% comprobaciones baratas y al final las que calculan dominios.
+% ------------------------------------------------------------
+
+% un grupo con mas sesiones semanales de las que caben sin solaparse
+diagnostico_previo(_, grupo_excede_franjas(C, G, Sem, Max)) :-
+    grupo(C, G, _, _, Sem, Dur, _),
+    num_franjas(NF),
+    findall(D, dia(D), Ds), length(Ds, ND),
+    Max is ND * (NF // Dur),
+    Sem > Max,
+    !.
+% un profesor con mas franjas que su maximo
+diagnostico_previo(Sesiones, carga_profesor(P, Carga, Max)) :-
+    profesor(P, _, Max, _),
+    carga_de(P, Sesiones, Carga),
+    Carga > Max,
+    !.
+% un profesor sin disponibilidad suficiente para lo que imparte
+diagnostico_previo(Sesiones, disponibilidad_insuficiente(P, Carga, Disponibles)) :-
+    profesor(P, _, _, Disp),
+    carga_de(P, Sesiones, Carga),
+    franjas_disponibles(Disp, Disponibles),
+    Carga > Disponibles,
+    !.
+% una sesion sin ningun valor posible (capacidad, tipo, aula_fija, ...)
 diagnostico_previo(Sesiones, dominio_vacio(C, G, I)) :-
     member(S, Sesiones),
     S = sesion(_, C, G, I, _, _),
     dominio(S, []),
     !.
-diagnostico_previo(Sesiones, carga_profesor(P, Carga, Max)) :-
-    profesor(P, _, Max, _),
+
+carga_de(P, Sesiones, Carga) :-
     findall(Dur, member(sesion(_, _, _, _, P, Dur), Sesiones), Ds),
-    suma(Ds, Carga),
-    Carga > Max,
-    !.
+    suma(Ds, Carga).
+
+% numero de celdas (dia, franja) en las que el profesor esta disponible
+franjas_disponibles(total, N) :- !,
+    num_franjas(NF),
+    findall(D, dia(D), Ds), length(Ds, ND),
+    N is NF * ND.
+franjas_disponibles(Disp, N) :-
+    num_franjas(NF),
+    findall(D-F,
+            (   member(rango(D, Desde, Hasta), Disp),
+                dia(D),
+                between(Desde, Hasta, F),
+                F >= 1, F =< NF
+            ),
+            Celdas),
+    sort(Celdas, Unicas),
+    length(Unicas, N).
 
 guardar_tiempos(Cpu, Real) :-
     g_assign(t_cpu, Cpu),
