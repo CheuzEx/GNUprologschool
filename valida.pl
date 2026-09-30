@@ -164,11 +164,11 @@ universo(Registros, u(Dias, NF, Aulas, Profs, Grupos, Durs)) :-
     findall(PN, (member(reg('PROFESOR',_,[P|_]), Registros),
                  normalizar_id(P, PN)), Profs0),
     sort(Profs0, Profs),
-    findall(CN-GN, (member(reg('CURSO',_,[C,G|_]), Registros),
+    findall(CN-GN, (member(reg('CURSO',_,[C,_,G|_]), Registros),
                     normalizar_id(C, CN), normalizar_id(G, GN)), Grupos0),
     sort(Grupos0, Grupos),
     findall(CN-GN-Dur,
-            ( member(reg('CURSO',_,[C,G,_,_,_,DurA|_]), Registros),
+            ( member(reg('CURSO',_,[C,_,G,_,_,DurA|_]), Registros),
               int_positivo(DurA, Dur),
               normalizar_id(C, CN), normalizar_id(G, GN) ),
             Durs).
@@ -210,7 +210,7 @@ err_dato('PROFESOR', [Cod, Nom, Max, Disp], _N, U, R) :- !,
     ;   R = profesor_invalido(Cod)
     ).
 
-err_dato('CURSO', [C,G,Nom,Insc,Sem,Dur,Req], _N, U, R) :- !,
+err_dato('CURSO', [C,Nom,G,Insc,Sem,Dur,Req], _N, U, R) :- !,
     U = u(_, NF, _, _, _, _),
     (   atom(C), atom(G), atom(Nom),
         int_positivo(Insc, _),
@@ -290,7 +290,7 @@ err_restriccion(T, A, _, aridad_restriccion(T, A)).
 % Pase 4: duplicados (curso, grupo), aulas y profesores
 % ------------------------------------------------------------
 validar_duplicados(Registros, Errores) :-
-    findall(CN-GN-N, (member(reg('CURSO',N,[C,G|_]), Registros),
+    findall(CN-GN-N, (member(reg('CURSO',N,[C,_,G|_]), Registros),
                       normalizar_id(C,CN), normalizar_id(G,GN)),
             Lista),
     findall(linea(N, par_duplicado(CG)),
@@ -318,7 +318,7 @@ duplicados_id(Seccion, Etiqueta, Registros, Errores) :-
 % ------------------------------------------------------------
 validar_cobertura_imparte(Registros, Errores) :-
     findall(linea(N, grupo_sin_profesor(CN-GN)),
-            ( member(reg('CURSO',N,[C,G|_]), Registros),
+            ( member(reg('CURSO',N,[C,_,G|_]), Registros),
               normalizar_id(C, CN), normalizar_id(G, GN),
               \+ ( member(reg('IMPARTE',_,[C2,G2|_]), Registros),
                    normalizar_id(C2, CN), normalizar_id(G2, GN) )
