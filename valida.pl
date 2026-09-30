@@ -27,9 +27,9 @@ validar_lineas(Lineas, Errores) :-
     validar_datos(Registros, U, ErroresDatos),
     validar_duplicados(Registros, ErroresDup),
     validar_cobertura_imparte(Registros, ErroresImp),
-    append([ErroresEstruct, ErroresSecc, ErroresConfig, ErroresDatos,
-            ErroresDup, ErroresImp], Todos),
-    sort(Todos, Errores).
+    concatenar([ErroresEstruct, ErroresSecc, ErroresConfig, ErroresDatos,
+                ErroresDup, ErroresImp], Errores0),
+    sort(Errores0, Errores).
 
 % ------------------------------------------------------------
 % Pase 1: recolectar registros y errores estructurales
@@ -301,7 +301,7 @@ validar_duplicados(Registros, Errores) :-
             Errores0),
     duplicados_id('AULA', aula_duplicada, Registros, ErrAulas),
     duplicados_id('PROFESOR', profesor_duplicado, Registros, ErrProfs),
-    append([Errores0, ErrAulas, ErrProfs], Todos),
+    concatenar([Errores0, ErrAulas, ErrProfs], Todos),
     sort(Todos, Errores).
 
 duplicados_id(Seccion, Etiqueta, Registros, Errores) :-
@@ -330,6 +330,13 @@ validar_cobertura_imparte(Registros, Errores) :-
 % Predicados auxiliares
 % ------------------------------------------------------------
 tipo_valido(teoria). tipo_valido(laboratorio). tipo_valido(mixta).
+
+% concatenar(+ListaDeListas, -Lista)
+% GNU Prolog no trae append/2 (solo append/3), asi que se define aqui.
+concatenar([], []).
+concatenar([L|Ls], R) :-
+    concatenar(Ls, R0),
+    append(L, R0, R).
 
 % Solo digitos decimales: rechaza vacios, negativos, decimales y
 % sintaxis que number_codes/2 aceptaria (0x10, 0'a, 1.0e3, ...).
