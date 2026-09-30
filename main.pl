@@ -170,8 +170,8 @@ etiqueta_estrategia(Est, Opc, Etiqueta) :-
 
 % Fecha y hora local "AAAA-MM-DD HH:MM:SS"; 'n/d' si no esta disponible.
 fecha_texto(Texto) :-
-    (   catch(date_time(dateTime(Y, Mo, D, H, Mi, Se)), _, fail)
-    ->  Se1 is integer(Se),
+    (   catch(date_time(dt(Y, Mo, D, H, Mi, Se)), _, fail)
+    ->  Se1 = Se,
         pad2(Mo, Mo2), pad2(D, D2), pad2(H, H2), pad2(Mi, Mi2), pad2(Se1, Se2),
         format_to_atom(Texto, "~w-~w-~w ~w:~w:~w", [Y, Mo2, D2, H2, Mi2, Se2])
     ;   Texto = 'n/d'
@@ -210,8 +210,10 @@ escribir_detalle(S, H) :-
 numerar_detalle(_, [], _).
 numerar_detalle(S, [asignacion(C,G,P,A,D,F,Dur)|Rs], N) :-
     Fin is F + Dur - 1,
+    nom(curso, C, CT), nom(grupo, G, GT), nom(profesor, P, PT),
+    nom(aula, A, AT), nom(dia, D, DT),
     format(S, "~w ~w ~w ~w ~w ~w ~w-~w~n",
-           [N, C, G, P, A, D, F, Fin]),
+           [N, CT, GT, PT, AT, DT, F, Fin]),
     N1 is N + 1,
     numerar_detalle(S, Rs, N1).
 
@@ -237,10 +239,11 @@ escribir_rejillas_aula(S, H) :-
     forall(member(A, As), escribir_rejilla(S, 'AULA', A, aula, H)).
 
 escribir_rejilla(S, Etiqueta, Clave, Tipo, H) :-
-    format(S, "~nHORARIO POR ~w: ~w~n", [Etiqueta, Clave]),
+    clave_texto(Tipo, Clave, ClaveT),
+    format(S, "~nHORARIO POR ~w: ~w~n", [Etiqueta, ClaveT]),
     findall(D, dia(D), Dias),
     format(S, "franja ", []),
-    forall(member(D, Dias), format(S, "~w ", [D])), nl(S),
+    forall(member(D, Dias), ( nom(dia, D, DT), format(S, "~w ", [DT]) )), nl(S),
     num_franjas(NF),
     forall(between(1, NF, F),
            fila_rejilla(S, Tipo, Clave, F, Dias, H)).
@@ -250,8 +253,9 @@ fila_rejilla(S, Tipo, Clave, F, Dias, H) :-
     forall(member(D, Dias), celda(S, Tipo, Clave, D, F, H)), nl(S).
 
 celda(S, Tipo, Clave, D, F, H) :-
-    (   celda_ocupada(Tipo, Clave, D, F, H, Et)
-    ->  format(S, "~w ", [Et])
+    (   celda_ocupada(Tipo, Clave, D, F, H, C/G)
+    ->  nom(curso, C, CT), nom(grupo, G, GT),
+        format(S, "~w/~w ", [CT, GT])
     ;   format(S, "-- ", [])
     ).
 
@@ -320,19 +324,99 @@ escribir_diagnostico(S, Razon) :-
     format(S, "Razon inmediata: ~w~n", [Razon]),
     sesiones(Sesiones), length(Sesiones, NSes),
     num_franjas(NF), findall(D, dia(D), Dias), length(Dias, ND),
+    findall(A, aula(A,_,_), As), length(As, NA),
     Total is NF * ND,
+    Celdas is NA * Total,
+    findall(Sem * Dur, grupo(_,_,_,_,Sem,Dur,_), Prods),
+    suma_prods(Prods, Requeridas),
     format(S, "Sesiones a programar : ~w~n", [NSes]),
     format(S, "Franjas disponibles  : ~w (~w dias x ~w franjas)~n",
            [Total, ND, NF]),
+    format(S, "Franjas-aula          : ~w requeridas de ~w disponibles (~w aulas x ~w)~n",
+           [Requeridas, Celdas, NA, Total]),
     (   grupo_mayor_demanda(C-G, Sem)
-    ->  format(S, "Grupo con mayor demanda : ~w (~w sesiones)~n", [C-G, Sem])
+    ->  nom(curso, C, CT), nom(grupo, G, GT),
+        format(S, "Grupo con mayor demanda : ~w ~w (~w sesiones)~n", [CT, GT, Sem])
     ;   true
     ),
     (   profesor_mayor_carga(P, Carga, Max)
-    ->  format(S, "Profesor con mayor carga: ~w (~w de ~w franjas)~n",
-               [P, Carga, Max])
+    ->  nom(profesor, P, PT),
+        format(S, "Profesor con mayor carga: ~w (~w de ~w franjas)~n",
+               [PT, Carga, Max])
     ;   true
+    ),
+    escribir_culpables(S).
+
+suma_prods([], 0).
+suma_prods([X|Xs], T) :- suma_prods(Xs, T0), V is X, T is T0 + V.
+
+% ------------------------------------------------------------
+% Restriccion declarada que bloquea la instancia (6.4 y 11).
+% Para cada restriccion dura declarada (aula_fija, prohibida, excluyentes)
+% se quita SOLA, se vuelve a resolver (bt + MRV, limite 200000) y, si
+% entonces hay solucion, se informa como culpable. Al terminar se restauran
+% todos los hechos en su orden original.
+% ------------------------------------------------------------
+escribir_culpables(S) :-
+    restricciones_culpables(Cs),
+    (   Cs == []
+    ->  format(S, "Restriccion declarada culpable: ninguna restriccion declarada, quitada sola, resuelve la instancia~n", []),
+        format(S, "  (el limite esta en aulas, franjas, disponibilidad o carga del profesor)~n", [])
+    ;   forall(member(R, Cs),
+               ( restriccion_texto(R, T),
+                 format(S, "Restriccion declarada culpable: ~w~n", [T]) ))
     ).
+
+tipo_duro(aula_fija(_,_,_)).
+tipo_duro(prohibida(_,_,_,_)).
+tipo_duro(excluyentes(_,_,_,_)).
+
+restricciones_culpables(Culpables) :-
+    findall(P-Todos, ( tipo_duro(P), findall(P, call(P), Todos) ), Grupos),
+    catch(probar_grupos(Grupos, Culpables), _, Culpables = []),
+    restaurar_grupos(Grupos).
+
+probar_grupos([], []).
+probar_grupos([P-Todos|Gs], Culp) :-
+    probar_uno(Todos, P, Todos, C1),
+    restaurar_grupos([P-Todos]),
+    probar_grupos(Gs, C2),
+    append(C1, C2, Culp).
+
+probar_uno([], _, _, []).
+probar_uno([R|Rs], P, Todos, Culp) :-
+    quitar_primero(Todos, R, Resto),
+    reponer(P, Resto),
+    (   resuelve_rapido -> Culp = [R|Culp1] ; Culp = Culp1 ),
+    probar_uno(Rs, P, Todos, Culp1).
+
+quitar_primero([X|Xs], R, Resto) :-
+    (   X == R -> Resto = Xs
+    ;   Resto = [X|Resto1], quitar_primero(Xs, R, Resto1)
+    ).
+
+reponer(P, Hechos) :-
+    functor(P, N, A), functor(Gen, N, A),
+    retractall(Gen),
+    forall(member(H, Hechos), assertz(H)).
+
+restaurar_grupos([]).
+restaurar_grupos([P-Todos|Gs]) :- reponer(P, Todos), restaurar_grupos(Gs).
+
+resuelve_rapido :-
+    catch(resolver(bt, [heuristica(mrv), limite(200000)], Res), _, fail),
+    Res = solucion(_).
+
+restriccion_texto(aula_fija(C,G,A), T) :- !,
+    nom(curso,C,CT), nom(grupo,G,GT), nom(aula,A,AT),
+    format_to_atom(T, "aula_fija ~w ~w -> ~w", [CT,GT,AT]).
+restriccion_texto(prohibida(C,G,D,F), T) :- !,
+    nom(curso,C,CT), nom(grupo,G,GT), nom(dia,D,DT),
+    format_to_atom(T, "prohibida ~w ~w en ~w~w", [CT,GT,DT,F]).
+restriccion_texto(excluyentes(C1,G1,C2,G2), T) :- !,
+    nom(curso,C1,C1T), nom(grupo,G1,G1T), nom(curso,C2,C2T), nom(grupo,G2,G2T),
+    format_to_atom(T, "excluyentes ~w ~w con ~w ~w", [C1T,G1T,C2T,G2T]).
+restriccion_texto(R, R).
 
 % CORREGIDO: el patron del keysort era [_-C-G|_], que se lee (_-C)-G
 % y nunca unifica con NegSem-(C-G).
@@ -443,3 +527,16 @@ min_de([X|Xs], M) :- min_de(Xs, M0), ( X < M0 -> M = X ; M = M0 ).
 
 max_de([X], X) :- !.
 max_de([X|Xs], M) :- max_de(Xs, M0), ( X > M0 -> M = X ; M = M0 ).
+% ------------------------------------------------------------
+% Nombres originales (A-101, P-001, IC-1802, L ...) para el texto de salida.
+% Los hechos asignacion/7 del archivo Prolog siguen normalizados.
+% ------------------------------------------------------------
+nom(Tipo, Norm, Texto) :-
+    (   original(Tipo, Norm, O) -> Texto = O ; Texto = Norm ).
+
+clave_texto(grupo, C-G, T) :- !,
+    nom(curso, C, CT), nom(grupo, G, GT),
+    format_to_atom(T, "~w ~w", [CT, GT]).
+clave_texto(profesor, P, T) :- !, nom(profesor, P, T).
+clave_texto(aula, A, T)     :- !, nom(aula, A, T).
+clave_texto(_, X, X).
