@@ -1,0 +1,17 @@
+# Inconsistente por construccion: un grupo con mas sesiones semanales
+# de las que caben sin solaparse (2 dias x 3 franjas = 6 franjas; 4 sesiones de 2 franjas = 8).
+#:CONFIG
+dias;L,M
+franjas;3
+inicio;07:00
+duracion_franja;60
+#:AULA
+A-101;40;teoria
+A-102;40;teoria
+#:PROFESOR
+P-001;Ana Rojas;20;
+#:CURSO
+IC-1802;Introduccion a la Programacion;C1;30;4;2;teoria
+#:IMPARTE
+IC-1802;C1;P-001
+#:RESTRICCION

@@ -47,16 +47,16 @@ recolectar_tipo(seccion(S),Ls, N, _, Rs, Es) :- !,
     N1 is N+1,
     (   seccion_conocida(S)
     ->  recolectar(Ls, N1, S, Rs, Es)
-    ;   recolectar(Ls, N1, desconocida, Rs,
-                   [linea(N, seccion_desconocida(S))|Es])
+    ;   Es = [linea(N, seccion_desconocida(S))|Es1],
+        recolectar(Ls, N1, desconocida, Rs, Es1)
     ).
 % los registros de una seccion desconocida se ignoran (ya se reporto la seccion)
 recolectar_tipo(registro(_), Ls, N, desconocida, Rs, Es) :- !,
     N1 is N+1,
     recolectar(Ls, N1, desconocida, Rs, Es).
-recolectar_tipo(registro(_), Ls, N, ninguna, Rs, Es) :- !,
+recolectar_tipo(registro(_), Ls, N, ninguna, Rs, [linea(N, registro_sin_seccion)|Es]) :- !,
     N1 is N+1,
-    recolectar(Ls, N1, ninguna, Rs, [linea(N, registro_sin_seccion)|Es]).
+    recolectar(Ls, N1, ninguna, Rs, Es).
 recolectar_tipo(registro(C), Ls, N, S, [reg(S,N,C)|Rs], Es) :-
     N1 is N+1,
     recolectar(Ls, N1, S, Rs, Es).

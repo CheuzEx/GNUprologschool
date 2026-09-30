@@ -1,0 +1,18 @@
+# Inconsistente por construccion: el grupo tiene mas inscritos (80) que la
+# capacidad de todas las aulas compatibles (maxima teoria = 50; el laboratorio no admite teoria).
+#:CONFIG
+dias;L,M,X,J,V
+franjas;7
+inicio;07:00
+duracion_franja;60
+#:AULA
+A-101;45;teoria
+A-102;50;teoria
+LAB-1;100;laboratorio
+#:PROFESOR
+P-001;Ana Rojas;12;
+#:CURSO
+MA-1002;Calculo I;C1;80;2;2;teoria
+#:IMPARTE
+MA-1002;C1;P-001
+#:RESTRICCION

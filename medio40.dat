@@ -1,0 +1,80 @@
+# Instancia mediana-grande (40 sesiones)
+# Generada con semilla 40: 40 sesiones semanales
+#:CONFIG
+dias;L,M,X,J,V
+franjas;7
+inicio;07:00
+duracion_franja;60
+#:AULA
+A-101;45;teoria
+A-102;50;teoria
+A-103;50;teoria
+A-104;30;teoria
+A-105;35;mixta
+LAB-1;25;laboratorio
+LAB-2;30;laboratorio
+#:PROFESOR
+P-001;Ana Rojas;11;L1-L7,X1-X7,V1-V7
+P-002;Luis Mora;11;L1-L7,M1-M7,V1-V7
+P-003;Carmen Diaz;11;M1-M7,X1-X7,J1-J7
+P-004;Jorge Solis;11;
+P-005;Marta Vega;11;
+P-006;Pedro Leon;11;L1-L7,X1-X7,J1-J7
+P-007;Sofia Ruiz;11;
+P-008;Raul Campos;11;L1-L7,X1-X7,J1-J7
+P-009;Elena Paz;11;
+P-010;Hugo Prado;11;L1-L7,X1-X7,J1-J7
+#:CURSO
+MA-1003;Introduccion a la Programacion;C1;31;2;2;teoria
+MA-1003;Introduccion a la Programacion;C2;31;2;2;teoria
+MA-1011;Estructuras de Datos;C1;40;3;1;teoria
+MA-1011;Estructuras de Datos;C2;40;3;1;teoria
+FI-1022;Circuitos Digitales;C1;28;2;1;teoria
+FI-1036;Calculo I;C1;31;2;2;teoria
+FI-1048;Calculo II;C1;28;2;1;mixta
+FI-1048;Calculo II;C2;28;2;1;mixta
+IC-1053;Algebra Lineal;C1;34;1;1;mixta
+IC-1064;Fisica General;C1;30;3;2;teoria
+IC-1064;Fisica General;C2;30;3;2;teoria
+FI-1078;Quimica General;C1;40;2;1;teoria
+EL-1087;Bases de Datos;C1;21;3;1;mixta
+EL-1087;Bases de Datos;C2;21;3;1;mixta
+IC-1097;Sistemas Operativos;C1;40;2;1;mixta
+IC-1097;Sistemas Operativos;C2;40;2;1;mixta
+MA-1103;Redes;C1;40;2;1;teoria
+MA-1114;Ingenieria de Software;C1;13;1;2;laboratorio
+#:IMPARTE
+MA-1003;C1;P-010
+MA-1003;C2;P-001
+MA-1011;C1;P-007
+MA-1011;C2;P-008
+FI-1022;C1;P-003
+FI-1036;C1;P-002
+FI-1048;C1;P-009
+FI-1048;C2;P-004
+IC-1053;C1;P-006
+IC-1064;C1;P-005
+IC-1064;C2;P-006
+FI-1078;C1;P-009
+EL-1087;C1;P-004
+EL-1087;C2;P-003
+IC-1097;C1;P-008
+IC-1097;C2;P-007
+MA-1103;C1;P-010
+MA-1114;C1;P-009
+#:RESTRICCION
+aula_fija;MA-1114;C1;LAB-1
+prohibida;FI-1022;C1;M7
+prohibida;FI-1048;C2;M4
+prohibida;FI-1048;C2;V7
+prohibida;FI-1048;C1;L4
+prohibida;MA-1103;C1;J4
+excluyentes;MA-1103;C1;FI-1078;C1
+prefiere;MA-1003;C1;M6;4
+prefiere;FI-1022;C1;M3;3
+prefiere;MA-1011;C2;J5;2
+prefiere;FI-1078;C1;V4;5
+compacta;IC-1097;C2;2
+compacta;FI-1048;C1;1
+compacta;FI-1048;C1;3
+compacta;IC-1064;C2;4

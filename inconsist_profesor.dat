@@ -1,0 +1,17 @@
+# Inconsistente por construccion: el profesor solo esta disponible 4 franjas
+# (L1-L2 y M1-M2) pero debe impartir 6 (3 sesiones de 2 franjas).
+#:CONFIG
+dias;L,M,X,J,V
+franjas;7
+inicio;07:00
+duracion_franja;60
+#:AULA
+A-101;45;teoria
+A-102;40;teoria
+#:PROFESOR
+P-001;Ana Rojas;12;L1-L2,M1-M2
+#:CURSO
+IC-2001;Estructuras de Datos;C1;30;3;2;teoria
+#:IMPARTE
+IC-2001;C1;P-001
+#:RESTRICCION

@@ -1,0 +1,165 @@
+# Instancia grande (80 sesiones)
+# Generada con semilla 80: 80 sesiones semanales
+#:CONFIG
+dias;L,M,X,J,V
+franjas;7
+inicio;07:00
+duracion_franja;60
+#:AULA
+A-101;40;teoria
+A-102;45;teoria
+A-103;50;teoria
+A-104;60;teoria
+A-105;45;mixta
+A-106;40;teoria
+A-107;40;teoria
+LAB-1;30;laboratorio
+LAB-2;25;laboratorio
+LAB-3;25;laboratorio
+#:PROFESOR
+P-001;Ana Rojas;14;L1-L7,M1-M7,X1-X7
+P-002;Luis Mora;14;
+P-003;Carmen Diaz;14;M1-M7,X1-X7,V1-V7
+P-004;Jorge Solis;14;
+P-005;Marta Vega;14;
+P-006;Pedro Leon;14;L1-L7,J1-J7,V1-V7
+P-007;Sofia Ruiz;14;
+P-008;Raul Campos;14;
+P-009;Elena Paz;14;
+P-010;Hugo Prado;14;
+P-011;Lucia Salas;14;
+P-012;Mario Rey;14;L1-L7,M1-M7,J1-J7
+P-013;Nora Cruz;14;
+P-014;Oscar Beltran;14;
+P-015;Paula Nunez;14;
+P-016;Ramon Ibarra;14;
+P-017;Sara Molina;14;
+P-018;Tomas Vidal;14;
+P-019;Ana Rojas;14;
+P-020;Luis Mora;14;
+#:CURSO
+IC-1009;Introduccion a la Programacion;C1;27;3;1;teoria
+MA-1019;Estructuras de Datos;C1;44;2;2;teoria
+MA-1026;Circuitos Digitales;C1;23;2;1;teoria
+FI-1032;Calculo I;C1;24;1;1;teoria
+EL-1041;Calculo II;C1;32;1;1;mixta
+EL-1051;Algebra Lineal;C1;39;2;2;mixta
+EL-1051;Algebra Lineal;C2;39;2;2;mixta
+FI-1061;Fisica General;C1;18;1;2;teoria
+FI-1061;Fisica General;C2;18;1;2;teoria
+IC-1071;Quimica General;C1;37;2;2;mixta
+EL-1082;Bases de Datos;C1;28;3;1;mixta
+MA-1094;Sistemas Operativos;C1;41;2;1;teoria
+QU-1105;Redes;C1;33;2;2;teoria
+EL-1119;Ingenieria de Software;C1;33;3;2;teoria
+FI-1126;Estadistica;C1;26;1;1;teoria
+EL-1135;Matematica Discreta;C1;18;2;2;teoria
+MA-1143;Arquitectura de Computadores;C1;23;2;1;mixta
+QU-1153;Teoria de la Computacion;C1;34;1;1;teoria
+QU-1153;Teoria de la Computacion;C2;34;1;1;teoria
+IC-1164;Inteligencia Artificial;C1;43;2;1;teoria
+MA-1176;Compiladores;C1;40;3;2;teoria
+QU-1187;Seguridad Informatica;C1;40;1;1;teoria
+QU-1194;Ecuaciones Diferenciales;C1;43;2;2;teoria
+FI-1207;Programacion Web;C1;32;2;2;teoria
+IC-1216;Analisis de Algoritmos;C1;19;1;3;laboratorio
+EL-1228;Electronica;C1;17;2;1;mixta
+QU-1234;Ingles Tecnico;C1;30;2;2;teoria
+MA-1243;Introduccion a la Programacion;C1;44;2;1;teoria
+IC-1257;Estructuras de Datos;C1;19;1;2;laboratorio
+QU-1266;Circuitos Digitales;C1;16;2;1;teoria
+QU-1266;Circuitos Digitales;C2;16;2;1;teoria
+IC-1277;Calculo I;C1;20;1;2;teoria
+IC-1277;Calculo I;C2;20;1;2;teoria
+IC-1285;Calculo II;C1;35;1;1;teoria
+QU-1298;Algebra Lineal;C1;18;1;2;laboratorio
+EL-1302;Fisica General;C1;43;2;1;teoria
+EL-1314;Quimica General;C1;43;2;1;teoria
+EL-1326;Bases de Datos;C1;19;3;2;mixta
+EL-1326;Bases de Datos;C2;19;3;2;mixta
+FI-1339;Sistemas Operativos;C1;32;1;1;mixta
+QU-1341;Redes;C1;43;1;1;teoria
+QU-1355;Ingenieria de Software;C1;24;2;1;teoria
+QU-1355;Ingenieria de Software;C2;24;2;1;teoria
+FI-1368;Estadistica;C1;25;2;2;teoria
+FI-1378;Matematica Discreta;C1;19;2;1;teoria
+#:IMPARTE
+IC-1009;C1;P-001
+MA-1019;C1;P-015
+MA-1026;C1;P-007
+FI-1032;C1;P-011
+EL-1041;C1;P-006
+EL-1051;C1;P-004
+EL-1051;C2;P-010
+FI-1061;C1;P-003
+FI-1061;C2;P-020
+IC-1071;C1;P-002
+EL-1082;C1;P-005
+MA-1094;C1;P-014
+QU-1105;C1;P-013
+EL-1119;C1;P-018
+FI-1126;C1;P-019
+EL-1135;C1;P-016
+MA-1143;C1;P-017
+QU-1153;C1;P-009
+QU-1153;C2;P-012
+IC-1164;C1;P-008
+MA-1176;C1;P-019
+QU-1187;C1;P-012
+QU-1194;C1;P-011
+FI-1207;C1;P-006
+IC-1216;C1;P-009
+EL-1228;C1;P-012
+QU-1234;C1;P-017
+MA-1243;C1;P-008
+IC-1257;C1;P-003
+QU-1266;C1;P-007
+QU-1266;C2;P-014
+IC-1277;C1;P-020
+IC-1277;C2;P-001
+IC-1285;C1;P-005
+QU-1298;C1;P-014
+EL-1302;C1;P-009
+EL-1314;C1;P-012
+EL-1326;C1;P-016
+EL-1326;C2;P-008
+FI-1339;C1;P-005
+QU-1341;C1;P-013
+QU-1355;C1;P-020
+QU-1355;C2;P-003
+FI-1368;C1;P-010
+FI-1378;C1;P-002
+#:RESTRICCION
+aula_fija;IC-1216;C1;LAB-2
+aula_fija;IC-1257;C1;LAB-2
+aula_fija;QU-1298;C1;LAB-1
+prohibida;EL-1051;C1;V7
+prohibida;QU-1298;C1;J3
+prohibida;EL-1302;C1;L7
+prohibida;FI-1126;C1;M6
+prohibida;EL-1051;C1;J6
+prohibida;FI-1339;C1;V4
+prohibida;QU-1355;C2;L1
+prohibida;EL-1051;C1;L7
+prohibida;QU-1153;C2;L5
+prohibida;FI-1339;C1;X5
+excluyentes;FI-1061;C2;FI-1061;C1
+excluyentes;EL-1051;C2;EL-1314;C1
+excluyentes;IC-1285;C1;QU-1266;C1
+excluyentes;QU-1266;C2;IC-1164;C1
+prefiere;EL-1228;C1;M3;4
+prefiere;IC-1277;C2;X4;4
+prefiere;FI-1061;C1;M4;2
+prefiere;IC-1164;C1;V5;3
+prefiere;EL-1302;C1;X3;2
+prefiere;MA-1143;C1;L6;2
+prefiere;EL-1302;C1;V4;1
+prefiere;QU-1266;C1;J2;5
+compacta;QU-1266;C2;4
+compacta;FI-1207;C1;2
+compacta;QU-1266;C2;1
+compacta;QU-1355;C2;2
+compacta;EL-1051;C2;1
+compacta;MA-1243;C1;2
+compacta;EL-1082;C1;2
+compacta;MA-1019;C1;5
