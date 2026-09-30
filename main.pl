@@ -386,12 +386,15 @@ huecos_dia(H, Tipo, Clave, D, N) :-
         N is Rango - Oc
     ).
 
+% between/3 de GNU Prolog exige enteros, no expresiones: se calcula Fin antes
 franja_ocupada(H, grupo, C-G, D, F) :-
     member(asignacion(C, G, _, _, D, F0, Dur), H),
-    between(F0, F0 + Dur - 1, F).
+    Fin is F0 + Dur - 1,
+    between(F0, Fin, F).
 franja_ocupada(H, profesor, P, D, F) :-
     member(asignacion(_, _, P, _, D, F0, Dur), H),
-    between(F0, F0 + Dur - 1, F).
+    Fin is F0 + Dur - 1,
+    between(F0, Fin, F).
 
 % Costo de restricciones blandas (seccion 4.4)
 costo_blandas(H, Costo) :-
