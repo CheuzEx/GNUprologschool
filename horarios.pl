@@ -16,6 +16,7 @@
 :- dynamic(excluyentes/4).
 :- dynamic(prefiere/5).
 :- dynamic(compacta/3).
+:- dynamic(original/3).      % original(Tipo, IdNormalizado, TextoOriginal) para la salida
 :- discontiguous(procesar_registro/3).
 
 % ---------- lectura de archivo, linea por linea ----------
@@ -179,6 +180,7 @@ asertar_cada_dia([]).
 asertar_cada_dia([Chars|Resto]) :-
     atom_chars(DiaMayus, Chars),
     normalizar_id(DiaMayus, DiaMin),
+    registrar_original(dia, DiaMin, DiaMayus),
     ( dia(DiaMin) -> true ; assertz(dia(DiaMin)) ),
     asertar_cada_dia(Resto).
 
@@ -198,7 +200,13 @@ limpiar_hechos :-
     retractall(grupo(_,_,_,_,_,_,_)), retractall(imparte(_,_,_)),
     retractall(aula_fija(_,_,_)), retractall(prohibida(_,_,_,_)),
     retractall(excluyentes(_,_,_,_)), retractall(prefiere(_,_,_,_,_)),
-    retractall(compacta(_,_,_)).
+    retractall(compacta(_,_,_)),
+    retractall(original(_,_,_)).
+
+% registrar_original(+Tipo, +Norm, +Orig): recuerda como se escribio en la instancia
+% (A-101, P-001, L...), para mostrarlo igual en el archivo de salida.
+registrar_original(Tipo, Norm, Orig) :-
+    (   original(Tipo, Norm, _) -> true ; assertz(original(Tipo, Norm, Orig)) ).
 
 procesar_con_seccion([], _N, _Seccion).
 procesar_con_seccion([L|Resto], N, SeccionActual) :-
@@ -233,6 +241,7 @@ procesar_registro('CONFIG', [duracion_franja, DStr], _N) :- !,
 
 procesar_registro('AULA', [Cod, CapStr, Tipo], _N) :- !,
     normalizar_id(Cod, CodN),
+    registrar_original(aula, CodN, Cod),
     atomo_numero(CapStr, Cap),
     assertz(aula(CodN, Cap, Tipo)).
 
@@ -240,6 +249,7 @@ procesar_registro('AULA', [Cod, CapStr, Tipo], _N) :- !,
 
 procesar_registro('PROFESOR', [Cod, Nombre, MaxStr, Disp], _N) :- !,
     normalizar_id(Cod, CodN),
+    registrar_original(profesor, CodN, Cod),
     atomo_numero(MaxStr, Max),
     parsear_disponibilidad(Disp, DispParsed),
     assertz(profesor(CodN, Nombre, Max, DispParsed)).
@@ -249,6 +259,8 @@ procesar_registro('PROFESOR', [Cod, Nombre, MaxStr, Disp], _N) :- !,
 procesar_registro('CURSO', [Cod, Nombre, Grupo, InscStr, SemStr, DurStr, Requiere], _N) :- !,
     normalizar_id(Cod, CodN),
     normalizar_id(Grupo, GrupoN),
+    registrar_original(curso, CodN, Cod),
+    registrar_original(grupo, GrupoN, Grupo),
     atomo_numero(InscStr, Insc),
     atomo_numero(SemStr, Sem),
     atomo_numero(DurStr, Dur),
