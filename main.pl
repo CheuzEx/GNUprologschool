@@ -44,14 +44,40 @@ main(_, _, _) :-
     format(user_error, "ERROR: la ejecucion fallo sin producir resultado~n", []),
     halt(1).
 
+% CAMBIO (6.2 / 6.5): el resultado se ordena UNA vez, justo despues de
+% resolver, para que el archivo de texto y el archivo asignacion/7
+% salgan identicos y en orden curso, grupo, dia, franja.
 ejecutar(Instancia, Salida, Estrategia) :-
     interpretar_estrategia(Estrategia, Est, Opc),
     cargar_instancia_segura(Instancia),
-    resolver(Est, Opc, Resultado),
+    resolver(Est, Opc, Resultado0),
+    ordenar_resultado(Resultado0, Resultado),
     escribir_salida(Salida, Instancia, Est, Opc, Resultado),
     escribir_salida_prolog(Opc, Resultado),
     codigo_resultado(Resultado, Codigo),
     halt(Codigo).
+
+% ordenar_resultado(+Resultado0, -Resultado)
+ordenar_resultado(solucion(H0), solucion(H)) :- !,
+    ordenar_asignaciones(H0, H).
+ordenar_resultado(R, R).
+
+% Orden: curso, grupo, indice del dia segun CONFIG (L,M,X,J,V), franja.
+% No se ordena el dia alfabeticamente (daria j,l,m,v,x).
+ordenar_asignaciones(H0, H) :-
+    findall(D, dia(D), Dias),
+    findall(k(C,G,I,F)-asignacion(C,G,P,A,D,F,Dur),
+            ( member(asignacion(C,G,P,A,D,F,Dur), H0),
+              pos_dia(D, Dias, I) ),
+            Pares),
+    keysort(Pares, Ordenados),
+    valores_de(Ordenados, H).
+
+pos_dia(D, [D|_], 1) :- !.
+pos_dia(D, [_|R], I) :- pos_dia(D, R, I0), I is I0 + 1.
+
+valores_de([], []).
+valores_de([_-V|R], [V|Vs]) :- valores_de(R, Vs).
 
 interpretar_estrategia(estrategia(Est, Opc), Est, Opc) :- !.
 interpretar_estrategia([Est|Opc], Est, Opc) :- !, atom(Est).
@@ -140,26 +166,27 @@ etiqueta_estrategia(Est, Opc, Etiqueta) :-
     ->  true
     ;   H = original
     ),
-    format(atom(Etiqueta), "~w (~w)", [Est, H]).
+    format_to_atom(Etiqueta, "~w (~w)", [Est, H]).
 
 % Fecha y hora local "AAAA-MM-DD HH:MM:SS"; 'n/d' si no esta disponible.
 fecha_texto(Texto) :-
     (   catch(date_time(dateTime(Y, Mo, D, H, Mi, Se)), _, fail)
     ->  Se1 is integer(Se),
         pad2(Mo, Mo2), pad2(D, D2), pad2(H, H2), pad2(Mi, Mi2), pad2(Se1, Se2),
-        format(atom(Texto), "~w-~w-~w ~w:~w:~w", [Y, Mo2, D2, H2, Mi2, Se2])
+        format_to_atom(Texto, "~w-~w-~w ~w:~w:~w", [Y, Mo2, D2, H2, Mi2, Se2])
     ;   Texto = 'n/d'
     ).
 
 pad2(N, A) :-
-    (   N < 10 -> format(atom(A), "0~w", [N]) ; format(atom(A), "~w", [N]) ).
+    (   N < 10 -> format_to_atom(A, "0~w", [N]) ; format_to_atom(A, "~w", [N]) ).
 
+% CAMBIO: escribir_resumen ahora recibe Opc (para saber si hubo optimizar)
 escribir_bloques(S, Opc, solucion(H)) :- !,
     escribir_detalle(S, H),
     escribir_rejillas_grupo(S, H),
     escribir_rejillas_profesor(S, H),
     ( member(por_aula, Opc) -> escribir_rejillas_aula(S, H) ; true ),
-    escribir_resumen(S, H).
+    escribir_resumen(S, Opc, H).
 escribir_bloques(S, _, sin_solucion(R)) :- !,
     escribir_diagnostico(S, R).
 escribir_bloques(S, _, limite_alcanzado) :- !,
@@ -239,7 +266,8 @@ celda_ocupada(aula, A, D, F, H, C/G) :-
     F >= F0, F < F0 + Dur, !.
 
 % -------- 6.4 RESUMEN --------
-escribir_resumen(S, H) :-
+% CAMBIO: escribir_resumen/3 (antes /2) e imprime la optimalidad (8.5)
+escribir_resumen(S, Opc, H) :-
     estadisticas(est(N, R, CpuMs, RealMs)),
     length(H, NSes),
     total_franjas_sesion(H, TF),
@@ -260,7 +288,31 @@ escribir_resumen(S, H) :-
     format(S, "Tiempo de CPU (s)                  ~w~n", [CpuS]),
     format(S, "Tiempo de pared (s)                ~w~n", [RealS]),
     format(S, "Nodos por segundo                  ~w~n", [Tasa]),
+    linea_optimo(S, Opc),
     format(S, "Estado final  solucion valida de costo ~w~n", [Costo]).
+
+% Solo se imprime cuando se uso la opcion optimizar
+linea_optimo(S, Opc) :-
+    (   member(optimizar, Opc)
+    ->  estado_optimo(O),
+        texto_optimo(O, T),
+        format(S, "Optimalidad                       ~w~n", [T])
+    ;   true
+    ).
+
+% opt_optimo lo deja busqueda_fd.pl: si | no | n_a.
+% En GNU Prolog una global sin asignar vale 0 (no lanza error),
+% por eso se valida el valor leido.
+estado_optimo(O) :-
+    (   catch(g_read(opt_optimo, O0), _, fail),
+        memberchk(O0, [si, no, n_a])
+    ->  O = O0
+    ;   O = n_a
+    ).
+
+texto_optimo(si,  'OPTIMA (arbol agotado)').
+texto_optimo(no,  'NO PROBADA (limite alcanzado, mejor solucion conocida)').
+texto_optimo(n_a, 'n/a').
 
 % -------- 6.4 alterno: DIAGNOSTICO --------
 escribir_diagnostico(S, Razon) :-
