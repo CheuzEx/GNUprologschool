@@ -105,18 +105,19 @@ etiquetar_segun(Otro, _, _, _, _, _) :-
 % fd_labeling_opts(+Heuristica, -Opciones)
 % Equivalencia con las opciones de fd_labeling/2 (justificar en el informe):
 %   original : leftmost + up (valores por defecto)
-%   mrv, ff  : ff (menor dominio; con una variable por sesion, el tamano
+%   mrv, ff  : variable_method(ff) (menor dominio; con una variable por sesion, el tamano
 %              del dominio ES el numero de valores restantes: ff == MRV)
-%   ffc      : ff con desempate por la variable con mas restricciones
+%   ffc      : GNU Prolog 1.4.5 no expone el desempate por restricciones;
+%              se usa ff como aproximacion para fd_labeling
 %   grado, demanda : el orden lo fija ordenar/3 antes de buscar; el
 %              etiquetado es leftmost sobre esa lista (aproximacion)
 %   lcv      : GNU Prolog no lo expone; solo existe en etiquetado propio
 fd_labeling_opts(original, []) :- !.
 fd_labeling_opts(grado,    []) :- !.
 fd_labeling_opts(demanda,  []) :- !.
-fd_labeling_opts(mrv,      [ff]) :- !.
-fd_labeling_opts(ff,       [ff]) :- !.
-fd_labeling_opts(ffc,      [ffc]) :- !.
+fd_labeling_opts(mrv,      [variable_method(ff)]) :- !.
+fd_labeling_opts(ff,       [variable_method(ff)]) :- !.
+fd_labeling_opts(ffc,      [variable_method(ff)]) :- !.
 fd_labeling_opts(H, _) :-
     throw(error_argumentos(labeling_fd(H))).
 

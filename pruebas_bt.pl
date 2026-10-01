@@ -90,30 +90,47 @@ correr(E, Opc, Nombre, Fila) :-
     Fila = r(Nombre, Txt, N, Ret, Cpu, Real, Ok, Costo, Opt).
 
 resumen(solucion(H), solucion, Ok, Costo) :- !,
-    (   verifica(H)
-    ->  Ok = valida
-    ;   Ok = 'INVALIDA',
-        violaciones(H, Vs),
-        format(user_error, "  ** horario INVALIDO, violaciones: ~w~n", [Vs])
-    ),
-    (   catch(costo_blandas(H, C0), _, fail) -> Costo = C0 ; Costo = '-' ).
+    resultado_verificacion(H, Ok),
+    costo_resultado(H, Costo).
 resumen(sin_solucion(Razon), sin_solucion(Razon), '-', '-') :- !.
 resumen(limite_alcanzado, limite_alcanzado, '-', '-') :- !.
 resumen(Otro, Otro, '-', '-').
 
+resultado_verificacion(H, valida) :-
+    verifica(H), !.
+resultado_verificacion(H, 'INVALIDA') :-
+    violaciones(H, Vs),
+    format(user_error, "  ** horario INVALIDO, violaciones: ~w~n", [Vs]).
+
+costo_resultado(H, Costo) :-
+    catch(costo_blandas(H, Costo), _, fail), !.
+costo_resultado(_, '-').
+
 % opt_optimo lo deja busqueda_fd.pl: si | no | n_a
 optimo_de(Opc, Opt) :-
-    (   member(optimizar, Opc)
-    ->  (   catch(g_read(opt_optimo, O), _, fail) -> Opt = O ; Opt = '-' )
-    ;   Opt = '-'
-    ).
+    optimo_de_opciones(Opc, Opt).
+
+optimo_de_opciones(Opc, Opt) :-
+    member(optimizar, Opc), !,
+    optimo_guardado(Opt).
+optimo_de_opciones(_, '-').
+
+optimo_guardado(Opt) :-
+    catch(g_read(opt_optimo, Opt), _, fail), !.
+optimo_guardado('-').
 
 % ------------------------------------------------------------
 % Metricas derivadas
 % ------------------------------------------------------------
 referencia(r(_, Txt, N, _, Cpu, _, _, _, _), ref(N, TRef, Pref)) :-
-    TRef is max(Cpu, 1),
-    (   Txt == limite_alcanzado -> Pref = '>=' ; Pref = '' ).
+    minimo_uno(Cpu, TRef),
+    prefijo_referencia(Txt, Pref).
+
+minimo_uno(N, N) :- N >= 1, !.
+minimo_uno(_, 1).
+
+prefijo_referencia(limite_alcanzado, '>=' ) :- !.
+prefijo_referencia(_, '').
 
 derivar_todas([], _, []).
 derivar_todas([R|Rs], Ref, [F|Fs]) :-
@@ -123,18 +140,22 @@ derivar_todas([R|Rs], Ref, [F|Fs]) :-
 % f(Nombre, Resultado, Nodos, Retroc, Cpu, Pared, Nod/s, S, E, Pref, Verif, Costo, Opt)
 derivar(r(Nom, Txt, N, Ret, Cpu, Real, Ok, Costo, Opt), ref(NRef, TRef, Pref),
         f(Nom, Txt, N, Ret, Cpu, Real, Rate, S, E, Pref, Ok, Costo, Opt)) :-
-    Tc is max(Cpu, 1),
+    minimo_uno(Cpu, Tc),
     Rate is round(N * 1000.0 / Tc),
-    (   comparable(Txt)
-    ->  S0 is TRef / (Tc * 1.0),
-        S is round(S0 * 100) / 100.0,
-        (   NRef > 0
-        ->  E0 is (NRef - N) / (NRef * 1.0),
-            E is round(E0 * 1000) / 1000.0
-        ;   E = '-'
-        )
-    ;   S = '-', E = '-'
-    ).
+    metricas_relativas(Txt, NRef, TRef, Tc, N, S, E).
+
+metricas_relativas(Txt, NRef, TRef, Tc, N, S, E) :-
+    comparable(Txt), !,
+    S0 is TRef / (Tc * 1.0),
+    S is round(S0 * 100) / 100.0,
+    eficiencia(NRef, N, E).
+metricas_relativas(_, _, _, _, _, '-', '-').
+
+eficiencia(NRef, N, E) :-
+    NRef > 0, !,
+    E0 is (NRef - N) / (NRef * 1.0),
+    E is round(E0 * 1000) / 1000.0.
+eficiencia(_, _, '-').
 
 comparable(Txt) :-
     Txt \== limite_alcanzado,
@@ -151,9 +172,7 @@ imprimir_tabla(Archivo, NSes, Limite, ref(NRef, TRef, Pref), Tabla) :-
     write('   Limite: '), write(Limite), write(' nodos'), nl,
     write('Referencia (ingenua): nodos='), write(NRef),
     write(' cpu_ms='), write(TRef),
-    (   Pref == '>=' -> write('   [alcanzo el limite: S y E son cotas inferiores]')
-    ;   true
-    ), nl,
+    escribir_nota_referencia(Pref), nl,
     write('Configuracion | Resultado | Nodos | Retroc. | CPU ms | Pared ms | Nod/s | S | E | Verifica | Costo | Optimo'),
     nl,
     imprimir_filas(Tabla).
@@ -172,6 +191,10 @@ imprimir_filas([f(Nom, Txt, N, Ret, Cpu, Real, Rate, S, E, Pref, Ok, Costo, Opt)
 escribir_relativo(_, '-') :- !, write('-').
 escribir_relativo(Pref, V) :- write(Pref), write(V).
 
+escribir_nota_referencia('>=') :- !,
+    write('   [alcanzo el limite: S y E son cotas inferiores]').
+escribir_nota_referencia(_).
+
 % ------------------------------------------------------------
 % CSV (para graficar en una hoja de calculo)
 % ------------------------------------------------------------
@@ -186,8 +209,11 @@ csv_filas([], _, _, _, _).
 csv_filas([f(Nom, Txt, N, Ret, Cpu, Real, Rate, S, E, Pref, Ok, Costo, Opt)|Fs],
           Archivo, NSes, Limite, Out) :-
     functor(Txt, TxtF, _),
-    (   Pref == '>=' -> Cota = si ; Cota = no ),
+    referencia_csv(Pref, Cota),
     format(Out, "~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w~n",
            [Archivo, NSes, Limite, Nom, TxtF, N, Ret, Cpu, Real, Rate,
             S, E, Cota, Ok, Costo, Opt]),
     csv_filas(Fs, Archivo, NSes, Limite, Out).
+
+referencia_csv('>=', si) :- !.
+referencia_csv(_, no).
