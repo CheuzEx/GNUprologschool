@@ -1,0 +1,35 @@
+#!/bin/sh
+# ============================================================
+# compilar.sh -- compila el proyecto a un ejecutable nativo con gplc
+# (seccion 10, configuracion 2: "Ejecucion compilada con gplc")
+#
+# Uso (desde la carpeta del proyecto):
+#   ./compilar.sh                 genera ./horarios_nativo
+#   ./compilar.sh otro_nombre     genera ./otro_nombre
+#
+# El ejecutable tiene la MISMA interfaz que horarios.sh:
+#   ./horarios_nativo instancia.dat salida.txt bt --heuristica=mrv
+#   ./horarios_nativo instancia.dat salida.txt clpfd --optimizar --limite=5000000
+#
+# --no-top-level: si por algun motivo el punto de entrada (nativo.pl)
+# retornara sin hacer halt/1, el programa termina en vez de abrir el
+# interprete interactivo.
+# ============================================================
+
+SALIDA=${1:-horarios_nativo}
+
+if ! command -v gplc >/dev/null 2>&1; then
+    echo "gplc no esta instalado (sudo apt install gprolog)" >&2
+    exit 1
+fi
+
+gplc --no-top-level -o "$SALIDA" \
+    horarios.pl busqueda_bt.pl busqueda_fd.pl valida.pl main.pl nativo.pl
+ESTADO=$?
+
+if [ $ESTADO -eq 0 ]; then
+    echo "Compilado: ./$SALIDA"
+else
+    echo "gplc fallo con codigo $ESTADO" >&2
+fi
+exit $ESTADO
