@@ -77,6 +77,7 @@ buscar_fd(Opc, Pares0, Sol) :-
     opcion(simetria,   Opc, no,       Sim),
     opcion(labeling,   Opc, propio,   ModoLab),
     g_assign(opt_optimo, n_a),
+    ajustar_vector,
     orden_previo(H, Pares0, Pares),
     preparar_indices,
     construir_vars(Pares, Vars),
@@ -477,3 +478,20 @@ grupo_asig([fv(sesion(_, C0, G0, _, P, Dur), X, _, _, Dom, _)|Vs], C, G, H) :-
     ;   H = H1
     ),
     grupo_asig(Vs, C, G, H1).
+
+% ------------------------------------------------------------
+% Tamano del vector de bits de los dominios FD.
+% Por defecto GNU Prolog usa 127: un dominio con valores mayores (p. ej.
+% X en 1..N con N > 127, o A*Big+T) se aproxima por intervalo y emite
+% "Warning: Vector too small - maybe lost solutions", con riesgo de
+% perder soluciones. Se ajusta ANTES de crear variables FD.
+% ------------------------------------------------------------
+ajustar_vector :-
+    findall(A, aula(A,_,_), As), length(As, NA),
+    findall(D, dia(D), Ds), length(Ds, ND),
+    num_franjas(NF),
+    K is NF + 1,
+    Big is ND * K + 1,
+    V is NA * Big + ND * K + NF + 2,
+    Vmax is max(V, 127),
+    fd_set_vector_max(Vmax).
