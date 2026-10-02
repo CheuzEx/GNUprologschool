@@ -1,22 +1,30 @@
+% main/3: uso interactivo, informa el codigo de salida y no termina el proceso.
 main(Instancia, Salida, Estrategia) :-
-    catch(
-        ejecutar(Instancia, Salida, Estrategia),
-        Error,
-        abortar(Error, Instancia, Salida, Estrategia)
-    ), !.
-main(_, _, _) :-
-    format(user_error, "ERROR: la ejecucion fallo sin producir resultado~n", []),
-    halt(1).
+    main_codigo(Instancia, Salida, Estrategia, Codigo),
+    format("Codigo de salida: ~w~n", [Codigo]).
 
-ejecutar(Instancia, Salida, Estrategia) :-
+% main_cli/3: uso desde la linea de comandos, termina con el codigo de salida.
+main_cli(Instancia, Salida, Estrategia) :-
+    main_codigo(Instancia, Salida, Estrategia, Codigo),
+    halt(Codigo).
+
+main_codigo(Instancia, Salida, Estrategia, Codigo) :-
+    catch(
+        ejecutar(Instancia, Salida, Estrategia, Codigo),
+        Error,
+        abortar(Error, Instancia, Salida, Estrategia, Codigo)
+    ), !.
+main_codigo(_, _, _, 1) :-
+    format(user_error, "ERROR: la ejecucion fallo sin producir resultado~n", []).
+
+ejecutar(Instancia, Salida, Estrategia, Codigo) :-
     interpretar_estrategia(Estrategia, Est, Opc),
     cargar_instancia_segura(Instancia),
     resolver(Est, Opc, Resultado0),
     ordenar_resultado(Resultado0, Resultado),
     escribir_salida(Salida, Instancia, Est, Opc, Resultado),
     escribir_salida_prolog(Opc, Resultado),
-    codigo_resultado(Resultado, Codigo),
-    halt(Codigo).
+    codigo_resultado(Resultado, Codigo).
 
 ordenar_resultado(solucion(H0), solucion(H)) :- !,
     ordenar_asignaciones(H0, H).
@@ -49,7 +57,7 @@ cargar_instancia_segura(Instancia) :-
     ;   throw(error_instancia(no_legible(Instancia)))
     ),
     catch(valida(Instancia), E1, throw(error_instancia(invalida(E1)))),
-    catch(cargar_instancia(Instancia), E2,
+    catch(cargar_instancia_sin_validar(Instancia), E2,
           throw(error_instancia(sintaxis(E2)))).
 
 codigo_resultado(solucion(_),           0) :- !.
@@ -63,7 +71,7 @@ codigo_error(error_argumentos(_), 4) :- !.
 codigo_error(error_escritura(_),  4) :- !.
 codigo_error(_,                   2).
 
-abortar(Error, Instancia, Salida, Estrategia) :-
+abortar(Error, Instancia, Salida, Estrategia, Codigo) :-
     format(user_error, "ERROR: ~w~n", [Error]),
     (   Error = error_instancia(_)
     ->  (   catch(interpretar_estrategia(Estrategia, Est, Opc), _, fail)
@@ -75,8 +83,7 @@ abortar(Error, Instancia, Salida, Estrategia) :-
               _, true)
     ;   true
     ),
-    codigo_error(Error, Codigo),
-    halt(Codigo).
+    codigo_error(Error, Codigo).
 
 % ------------------------------------------------------------
 % Archivo de salida
