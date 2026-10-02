@@ -1,15 +1,8 @@
 #!/bin/sh
-# ============================================================
-# horarios.sh -- envoltorio de invocacion (seccion 9 del PDF)
+# horarios.sh -- envoltorio de invocacion
 #
-# Uso:
-#   ./horarios.sh instancia.dat salida.txt bt
-#   ./horarios.sh instancia.dat salida.txt bt  --heuristica=mrv
-#   ./horarios.sh instancia.dat salida.txt bt  --heuristica=grado --simetria=si
-#   ./horarios.sh instancia.dat salida.txt clpfd --heuristica=ff
+#   ./horarios.sh instancia.dat salida.txt bt --heuristica=mrv
 #   ./horarios.sh instancia.dat salida.txt clpfd --optimizar --limite=5000000
-#   ./horarios.sh instancia.dat salida.txt clpfd --salida-prolog=salida.pl --por-aula
-# ============================================================
 
 if [ $# -lt 3 ]; then
     echo "Uso: $0 <instancia.dat> <salida.txt> <bt|bt_gp|clpfd> [opciones...]" >&2
@@ -42,15 +35,14 @@ for arg in "$@"; do
         --salida-prolog=*)  R=${arg#--salida-prolog=}
                             OPCIONES="$OPCIONES,salida_prolog('$R')" ;;
         --labeling=*)       LB=${arg#--labeling=}
-                            OPCIONES="$OPCIONES,labeling($LB)" ;;   # NUEVO
+                            OPCIONES="$OPCIONES,labeling($LB)" ;;
         *)  echo "Opcion desconocida: $arg" >&2; exit 4 ;;
     esac
 done
 
-# Quitar la coma inicial (si hay opciones)
 OPCIONES=$(printf '%s' "$OPCIONES" | sed 's/^,//')
 
-GOAL="main('$INSTANCIA','$SALIDA',estrategia($ESTRATEGIA,[$OPCIONES]))"
+GOAL="main_cli('$INSTANCIA','$SALIDA',estrategia($ESTRATEGIA,[$OPCIONES]))"
 
 exec gprolog --quiet \
     --consult-file horarios.pl \
