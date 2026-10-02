@@ -1,39 +1,3 @@
-% ============================================================
-% main.pl -- interfaz de linea de comandos
-% Se consulta DESPUES de:
-%   horarios.pl, busqueda_bt.pl, busqueda_fd.pl, valida.pl
-%
-% Invocacion tipica:
-%   gprolog --consult-file horarios.pl \
-%           --consult-file busqueda_bt.pl \
-%           --consult-file busqueda_fd.pl \
-%           --consult-file valida.pl \
-%           --consult-file main.pl \
-%           --entry-goal "main('in.dat','out.txt',estrategia(clpfd,[heuristica(mrv)]))"
-%
-% Codigos de salida (halt/1):
-%   0  solucion encontrada
-%   1  sin solucion (instancia consistente pero insatisfacible)
-%   2  instancia invalida / no legible
-%   3  limite de busqueda alcanzado
-%   4  argumentos o error de escritura
-% ============================================================
-
-% ------------------------------------------------------------
-% main/3
-%   Estrategia admite:
-%       bt | bt_gp | clpfd
-%       [bt, heuristica(mrv), limite(5000000)]
-%       estrategia(bt, [heuristica(mrv), simetria(si)])
-%
-%   Opciones adicionales reconocidas aqui (no por resolver/3):
-%       salida_prolog(Ruta)   -> escribe hechos asignacion/7   (6.5)
-%       por_aula              -> anade rejilla por aula         (6.3)
-%
-% main/3 SIEMPRE termina con halt/1: ejecutar/3 llama a halt al
-% acabar, las excepciones las maneja abortar/4 y, si ejecutar/3
-% fallara sin lanzar excepcion, la segunda clausula termina con 1.
-% ------------------------------------------------------------
 main(Instancia, Salida, Estrategia) :-
     catch(
         ejecutar(Instancia, Salida, Estrategia),
@@ -44,9 +8,6 @@ main(_, _, _) :-
     format(user_error, "ERROR: la ejecucion fallo sin producir resultado~n", []),
     halt(1).
 
-% CAMBIO (6.2 / 6.5): el resultado se ordena UNA vez, justo despues de
-% resolver, para que el archivo de texto y el archivo asignacion/7
-% salgan identicos y en orden curso, grupo, dia, franja.
 ejecutar(Instancia, Salida, Estrategia) :-
     interpretar_estrategia(Estrategia, Est, Opc),
     cargar_instancia_segura(Instancia),
@@ -57,13 +18,11 @@ ejecutar(Instancia, Salida, Estrategia) :-
     codigo_resultado(Resultado, Codigo),
     halt(Codigo).
 
-% ordenar_resultado(+Resultado0, -Resultado)
 ordenar_resultado(solucion(H0), solucion(H)) :- !,
     ordenar_asignaciones(H0, H).
 ordenar_resultado(R, R).
 
-% Orden: curso, grupo, indice del dia segun CONFIG (L,M,X,J,V), franja.
-% No se ordena el dia alfabeticamente (daria j,l,m,v,x).
+% Orden: curso, grupo, posicion del dia segun CONFIG, franja.
 ordenar_asignaciones(H0, H) :-
     findall(D, dia(D), Dias),
     findall(k(C,G,I,F)-asignacion(C,G,P,A,D,F,Dur),
@@ -93,23 +52,17 @@ cargar_instancia_segura(Instancia) :-
     catch(cargar_instancia(Instancia), E2,
           throw(error_instancia(sintaxis(E2)))).
 
-% codigo_resultado(+Resultado, -CodigoSalida)
-codigo_resultado(solucion(_),         0) :- !.
-codigo_resultado(sin_solucion(_),     1) :- !.
-codigo_resultado(limite_alcanzado,    3) :- !.
+codigo_resultado(solucion(_),           0) :- !.
+codigo_resultado(sin_solucion(_),       1) :- !.
+codigo_resultado(limite_alcanzado,      3) :- !.
 codigo_resultado(instancia_invalida(_), 2) :- !.
-codigo_resultado(_,                   1).
+codigo_resultado(_,                     1).
 
-% codigo_error(+Error, -CodigoSalida)
 codigo_error(error_instancia(_),  2) :- !.
 codigo_error(error_argumentos(_), 4) :- !.
 codigo_error(error_escritura(_),  4) :- !.
 codigo_error(_,                   2).
 
-% abortar(+Error, +Instancia, +Salida, +Estrategia)
-% Informa por stderr. Si la instancia es invalida intenta ademas dejar
-% un archivo de salida con Estado = INSTANCIA INVALIDA (6.1); si no se
-% puede escribir, se ignora y se sale igual con el codigo 2.
 abortar(Error, Instancia, Salida, Estrategia) :-
     format(user_error, "ERROR: ~w~n", [Error]),
     (   Error = error_instancia(_)
@@ -126,7 +79,7 @@ abortar(Error, Instancia, Salida, Estrategia) :-
     halt(Codigo).
 
 % ------------------------------------------------------------
-% Escritura del archivo de salida (seccion 6)
+% Archivo de salida
 % ------------------------------------------------------------
 escribir_salida(Archivo, Instancia, Est, Opc, Resultado) :-
     (   catch(open(Archivo, write, S), _, fail)
@@ -155,12 +108,11 @@ escribir_encabezado(S, Instancia, Est, Opc, Resultado) :-
     format(S, "Fecha : ~w~n", [Fecha]),
     format(S, "----------------------------------------------------------------~n", []).
 
-estado_texto(solucion(_),         'SOLUCION ENCONTRADA').
-estado_texto(sin_solucion(_),     'SIN SOLUCION').
-estado_texto(limite_alcanzado,    'LIMITE ALCANZADO').
+estado_texto(solucion(_),           'SOLUCION ENCONTRADA').
+estado_texto(sin_solucion(_),       'SIN SOLUCION').
+estado_texto(limite_alcanzado,      'LIMITE ALCANZADO').
 estado_texto(instancia_invalida(_), 'INSTANCIA INVALIDA').
 
-% Estrategia + heuristica, p. ej. "clpfd (mrv)"
 etiqueta_estrategia(Est, Opc, Etiqueta) :-
     (   catch(opcion(heuristica, Opc, original, H), _, fail)
     ->  true
@@ -168,11 +120,9 @@ etiqueta_estrategia(Est, Opc, Etiqueta) :-
     ),
     format_to_atom(Etiqueta, "~w (~w)", [Est, H]).
 
-% Fecha y hora local "AAAA-MM-DD HH:MM:SS"; 'n/d' si no esta disponible.
 fecha_texto(Texto) :-
     (   catch(date_time(dt(Y, Mo, D, H, Mi, Se)), _, fail)
-    ->  Se1 = Se,
-        pad2(Mo, Mo2), pad2(D, D2), pad2(H, H2), pad2(Mi, Mi2), pad2(Se1, Se2),
+    ->  pad2(Mo, Mo2), pad2(D, D2), pad2(H, H2), pad2(Mi, Mi2), pad2(Se, Se2),
         format_to_atom(Texto, "~w-~w-~w ~w:~w:~w", [Y, Mo2, D2, H2, Mi2, Se2])
     ;   Texto = 'n/d'
     ).
@@ -180,7 +130,6 @@ fecha_texto(Texto) :-
 pad2(N, A) :-
     (   N < 10 -> format_to_atom(A, "0~w", [N]) ; format_to_atom(A, "~w", [N]) ).
 
-% CAMBIO: escribir_resumen ahora recibe Opc (para saber si hubo optimizar)
 escribir_bloques(S, Opc, solucion(H)) :- !,
     escribir_detalle(S, H),
     escribir_rejillas_grupo(S, H),
@@ -196,12 +145,11 @@ escribir_bloques(S, _, instancia_invalida(Error)) :- !,
     errores_lista(Error, Lista),
     forall(member(E, Lista), format(S, "  ~w~n", [E])).
 
-% Aplana el termino de error de valida/1 a una lista de errores
 errores_lista(error_instancia(invalida(errores_instancia(L))), L) :- !.
 errores_lista(error_instancia(Causa), [Causa]) :- !.
 errores_lista(E, [E]).
 
-% -------- 6.2 DETALLE DE ASIGNACIONES --------
+% ---- Detalle de asignaciones ----
 escribir_detalle(S, H) :-
     format(S, "~nDETALLE DE ASIGNACIONES~n", []),
     format(S, "# Curso Grupo Profesor Aula Dia Franjas~n", []),
@@ -217,7 +165,7 @@ numerar_detalle(S, [asignacion(C,G,P,A,D,F,Dur)|Rs], N) :-
     N1 is N + 1,
     numerar_detalle(S, Rs, N1).
 
-% -------- 6.3 HORARIO POR GRUPO / PROFESOR / AULA --------
+% ---- Rejillas por grupo, profesor y aula ----
 escribir_rejillas_grupo(S, H) :-
     findall(C-G, ( grupo(C,G,_,_,_,_,_),
                    member(asignacion(C,G,_,_,_,_,_), H) ),
@@ -269,8 +217,7 @@ celda_ocupada(aula, A, D, F, H, C/G) :-
     member(asignacion(C, G, _, A, D, F0, Dur), H),
     F >= F0, F < F0 + Dur, !.
 
-% -------- 6.4 RESUMEN --------
-% CAMBIO: escribir_resumen/3 (antes /2) e imprime la optimalidad (8.5)
+% ---- Resumen ----
 escribir_resumen(S, Opc, H) :-
     estadisticas(est(N, R, CpuMs, RealMs)),
     length(H, NSes),
@@ -295,7 +242,6 @@ escribir_resumen(S, Opc, H) :-
     linea_optimo(S, Opc),
     format(S, "Estado final  solucion valida de costo ~w~n", [Costo]).
 
-% Solo se imprime cuando se uso la opcion optimizar
 linea_optimo(S, Opc) :-
     (   member(optimizar, Opc)
     ->  estado_optimo(O),
@@ -304,9 +250,7 @@ linea_optimo(S, Opc) :-
     ;   true
     ).
 
-% opt_optimo lo deja busqueda_fd.pl: si | no | n_a.
-% En GNU Prolog una global sin asignar vale 0 (no lanza error),
-% por eso se valida el valor leido.
+% Una global sin asignar vale 0 en GNU Prolog, por eso se valida el valor.
 estado_optimo(O) :-
     (   catch(g_read(opt_optimo, O0), _, fail),
         memberchk(O0, [si, no, n_a])
@@ -318,7 +262,7 @@ texto_optimo(si,  'OPTIMA (arbol agotado)').
 texto_optimo(no,  'NO PROBADA (limite alcanzado, mejor solucion conocida)').
 texto_optimo(n_a, 'n/a').
 
-% -------- 6.4 alterno: DIAGNOSTICO --------
+% ---- Diagnostico ----
 escribir_diagnostico(S, Razon) :-
     format(S, "~nDIAGNOSTICO~n", []),
     format(S, "Razon inmediata: ~w~n", [Razon]),
@@ -350,13 +294,8 @@ escribir_diagnostico(S, Razon) :-
 suma_prods([], 0).
 suma_prods([X|Xs], T) :- suma_prods(Xs, T0), V is X, T is T0 + V.
 
-% ------------------------------------------------------------
-% Restriccion declarada que bloquea la instancia (6.4 y 11).
-% Para cada restriccion dura declarada (aula_fija, prohibida, excluyentes)
-% se quita SOLA, se vuelve a resolver (bt + MRV, limite 200000) y, si
-% entonces hay solucion, se informa como culpable. Al terminar se restauran
-% todos los hechos en su orden original.
-% ------------------------------------------------------------
+% Restriccion culpable: se quita cada restriccion dura declarada sola y
+% se resuelve de nuevo; los hechos se restauran al terminar.
 escribir_culpables(S) :-
     restricciones_culpables(Cs),
     (   Cs == []
@@ -418,8 +357,6 @@ restriccion_texto(excluyentes(C1,G1,C2,G2), T) :- !,
     format_to_atom(T, "excluyentes ~w ~w con ~w ~w", [C1T,G1T,C2T,G2T]).
 restriccion_texto(R, R).
 
-% CORREGIDO: el patron del keysort era [_-C-G|_], que se lee (_-C)-G
-% y nunca unifica con NegSem-(C-G).
 grupo_mayor_demanda(C-G, Sem) :-
     findall(NegSem-(C0-G0), ( grupo(C0,G0,_,_,Sem0,_,_),
                               NegSem is -Sem0 ),
@@ -438,7 +375,7 @@ profesor_mayor_carga(P, Carga, Max) :-
     findall(Dur, member(sesion(_,_,_,_,P,Dur), Ss), Ds1),
     suma(Ds1, Carga).
 
-% -------- Metricas auxiliares --------
+% ---- Metricas auxiliares ----
 total_franjas_sesion(H, T) :-
     findall(Dur, member(asignacion(_,_,_,_,_,_,Dur), H), Ds),
     suma(Ds, T).
@@ -470,7 +407,6 @@ huecos_dia(H, Tipo, Clave, D, N) :-
         N is Rango - Oc
     ).
 
-% between/3 de GNU Prolog exige enteros, no expresiones: se calcula Fin antes
 franja_ocupada(H, grupo, C-G, D, F) :-
     member(asignacion(C, G, _, _, D, F0, Dur), H),
     Fin is F0 + Dur - 1,
@@ -480,7 +416,6 @@ franja_ocupada(H, profesor, P, D, F) :-
     Fin is F0 + Dur - 1,
     between(F0, Fin, F).
 
-% Costo de restricciones blandas (seccion 4.4)
 costo_blandas(H, Costo) :-
     findall(W, ( prefiere(C,G,D,F,W),
                  \+ tiene_sesion_en(H, C, G, D, F) ),
@@ -494,9 +429,7 @@ costo_blandas(H, Costo) :-
 tiene_sesion_en(H, C, G, D, F) :-
     member(asignacion(C, G, _, _, D, F, _), H).
 
-% ------------------------------------------------------------
-% 6.5: archivo Prolog consultable con hechos asignacion/7
-% ------------------------------------------------------------
+% ---- Archivo Prolog con hechos asignacion/7 ----
 escribir_salida_prolog(Opc, Resultado) :-
     (   member(salida_prolog(Ruta), Opc),
         Resultado = solucion(H)
@@ -518,19 +451,14 @@ escribir_hechos_asignacion(Ruta, H) :-
     ),
     close(S).
 
-% ------------------------------------------------------------
-% Utilidades locales (nombres propios para no chocar con las
-% min_list/max_list de la biblioteca de GNU Prolog)
-% ------------------------------------------------------------
+% ---- Utilidades ----
 min_de([X], X) :- !.
 min_de([X|Xs], M) :- min_de(Xs, M0), ( X < M0 -> M = X ; M = M0 ).
 
 max_de([X], X) :- !.
 max_de([X|Xs], M) :- max_de(Xs, M0), ( X > M0 -> M = X ; M = M0 ).
-% ------------------------------------------------------------
-% Nombres originales (A-101, P-001, IC-1802, L ...) para el texto de salida.
-% Los hechos asignacion/7 del archivo Prolog siguen normalizados.
-% ------------------------------------------------------------
+
+% Nombres originales (A-101, P-001, ...) para el texto de salida.
 nom(Tipo, Norm, Texto) :-
     (   original(Tipo, Norm, O) -> Texto = O ; Texto = Norm ).
 
