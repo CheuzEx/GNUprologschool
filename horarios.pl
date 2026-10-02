@@ -1,7 +1,4 @@
-% ============================================================
-% horarios.pl -- Fase 1: lectura, parsing y representacion
-% Asignacion de Horarios Universitarios (GNU Prolog)
-% ============================================================
+% horarios.pl -- lectura, parsing y representacion de la instancia
 
 :- dynamic(dia/1).
 :- dynamic(num_franjas/1).
@@ -16,13 +13,10 @@
 :- dynamic(excluyentes/4).
 :- dynamic(prefiere/5).
 :- dynamic(compacta/3).
-:- dynamic(original/3).      % original(Tipo, IdNormalizado, TextoOriginal) para la salida
+:- dynamic(original/3).
 :- discontiguous(procesar_registro/3).
 
-% ---------- lectura de archivo, linea por linea ----------
-% GNU Prolog 1.4.5 no trae read_line/2 ni split_string/4, asi que
-% se construyen a mano con get_char/2 y append/3.
-
+% ---- Lectura de archivo, linea por linea ----
 leer_lineas(Path, Lineas) :-
     open(Path, read, S),
     leer_todas(S, Lineas),
@@ -44,23 +38,17 @@ leer_linea(S, Chars, Estado) :-
 
 procesar_char(end_of_file, _S, [], fin) :- !.
 procesar_char('\n', _S, [], continua) :- !.
-% CORREGIDO: se descarta '\r' para tolerar archivos con fin de linea
-% CRLF (Windows); si no, cada ultimo campo de la linea trae un '\r'.
 procesar_char('\r', S, Chars, Estado) :- !,
     leer_linea(S, Chars, Estado).
 procesar_char(C, S, [C|Resto], Estado) :-
     leer_linea(S, Resto, Estado).
 
-% ---------- split generico por un separador, sobre listas de chars ----------
-% Conserva campos vacios al final (ej "a;b;" -> [[a],[b],[]]).
-
+% ---- Division por separador (conserva campos vacios al final) ----
 split_on(Sep, Chars, [Campo|Resto]) :-
     ( append(Campo, [Sep|Despues], Chars)
     -> split_on(Sep, Despues, Resto)
     ;  Campo = Chars, Resto = []
     ).
-
-% ---------- dividir una linea en campos por ';', recortando espacios ----------
 
 dividir_campos(Linea, Campos) :-
     atom_chars(Linea, Chars),
@@ -79,33 +67,25 @@ recortar(Chars, Recortado) :-
     quitar_espacios_inicio(Invertido, SinFinInvertido),
     reverse(SinFinInvertido, Recortado).
 
-% espacios y tabuladores
 quitar_espacios_inicio([' '|Resto], SinEspacios) :- !,
     quitar_espacios_inicio(Resto, SinEspacios).
 quitar_espacios_inicio(['\t'|Resto], SinEspacios) :- !,
     quitar_espacios_inicio(Resto, SinEspacios).
 quitar_espacios_inicio(Chars, Chars).
 
-% recortar sobre un atomo completo
 recortar_atomo(Atomo, Recortado) :-
     atom_chars(Atomo, Chars),
     recortar(Chars, RChars),
     atom_chars(Recortado, RChars).
 
-% ---------- conversion atomo -> numero ----------
-% RENOMBRADO: antes se llamaba atom_number/2, que en versiones recientes
-% de GNU Prolog ya es predicado predefinido (redefinirlo da
-% permission_error). Con otro nombre funciona en cualquier version.
-% Lanza excepcion de sintaxis si el atomo no es un numero; valida/1
-% ya lo comprobo antes de cargar.
-
+% ---- Conversion atomo -> numero ----
+% Se evita el nombre atom_number/2, que ya esta predefinido en versiones
+% recientes de GNU Prolog.
 atomo_numero(Atom, Number) :-
     atom_codes(Atom, Codes),
     number_codes(Number, Codes).
 
-% ---------- normalizacion de identificadores ----------
-% minusculas y guion -> guion_bajo (IC-1802 -> ic_1802, P-001 -> p_001)
-
+% ---- Normalizacion de identificadores (IC-1802 -> ic_1802) ----
 normalizar_id(Original, Normalizado) :-
     atom_codes(Original, Codigos),
     normalizar_codigos(Codigos, CodigosNorm),
@@ -120,11 +100,7 @@ normalizar_codigo(0'-, 0'_) :- !.
 normalizar_codigo(C, C2) :- C >= 0'A, C =< 0'Z, !, C2 is C + 32.
 normalizar_codigo(C, C).
 
-% ---------- clasificacion de lineas ----------
-% CORREGIDO: la linea se recorta primero. Asi una linea con solo
-% espacios/tabs es 'blanco' y un encabezado como "#:CONFIG   " (o
-% "#: CONFIG") se reconoce como seccion.
-
+% ---- Clasificacion de lineas ----
 clasificar_linea(Linea0, Tipo) :-
     recortar_atomo(Linea0, Linea),
     clasificar_recortada(Linea, Tipo).
@@ -138,9 +114,7 @@ clasificar_recortada(Linea, comentario) :-
 clasificar_recortada(Linea, registro(Campos)) :-
     dividir_campos(Linea, Campos).
 
-% ---------- parseo de disponibilidad de profesor: "L1-L7,M1-M7" ----------
-% Se toleran espacios alrededor de comas y guiones.
-
+% ---- Disponibilidad de profesor: "L1-L7,M1-M7" ----
 parsear_disponibilidad(Atom, total) :- Atom == '', !.
 parsear_disponibilidad(Atom, Rangos) :-
     atom_chars(Atom, Chars),
@@ -156,21 +130,18 @@ parsear_lista_rangos([CharsUnRango|Resto], [rango(Dia, Desde, Hasta)|RestoRangos
     extraer_dia_franja(CharsFin, _DiaFin, Hasta),
     parsear_lista_rangos(Resto, RestoRangos).
 
-% extraer_dia_franja(+Chars, -DiaMinuscula, -NumeroFranja)
-% Chars viene de algo como "L1" o "V5": primer char = dia, resto = numero
+% "L1" -> dia l, franja 1
 extraer_dia_franja([CDia|CharsNum], DiaMin, Num) :-
     atom_chars(DiaMayus, [CDia]),
     normalizar_id(DiaMayus, DiaMin),
     atom_chars(AtomoNum, CharsNum),
     atomo_numero(AtomoNum, Num).
 
-% igual, pero recibe el atomo completo directo (para RESTRICCION: "V5")
 extraer_dia_franja_atom(Atom, DiaMin, Franja) :-
     atom_chars(Atom, Chars),
     extraer_dia_franja(Chars, DiaMin, Franja).
 
-% ---------- asertar los dias declarados en CONFIG ----------
-
+% ---- Dias declarados en CONFIG ----
 asertar_dias(ListaAtom) :-
     atom_chars(ListaAtom, Chars),
     split_on(',', Chars, ListasChars),
@@ -184,15 +155,19 @@ asertar_cada_dia([Chars|Resto]) :-
     ( dia(DiaMin) -> true ; assertz(dia(DiaMin)) ),
     asertar_cada_dia(Resto).
 
-% ---------- bucle principal: recorre lineas llevando la seccion actual ----------
-
+% ---- Carga de la instancia ----
+% cargar_instancia/1 valida primero (valida.pl) y solo carga los hechos si
+% la instancia es coherente. cargar_instancia_sin_validar/1 es la lectura
+% pura, para quien ya valido por su cuenta.
 cargar_instancia(Path) :-
+    valida(Path),
+    cargar_instancia_sin_validar(Path).
+
+cargar_instancia_sin_validar(Path) :-
     limpiar_hechos,
     leer_lineas(Path, Lineas),
     procesar_con_seccion(Lineas, 1, ninguna).
 
-% limpia hechos de una carga anterior (util si se llama cargar_instancia
-% mas de una vez en la misma sesion)
 limpiar_hechos :-
     retractall(dia(_)), retractall(num_franjas(_)),
     retractall(hora_inicio(_)), retractall(duracion_franja(_)),
@@ -203,8 +178,8 @@ limpiar_hechos :-
     retractall(compacta(_,_,_)),
     retractall(original(_,_,_)).
 
-% registrar_original(+Tipo, +Norm, +Orig): recuerda como se escribio en la instancia
-% (A-101, P-001, L...), para mostrarlo igual en el archivo de salida.
+% Guarda como se escribio el identificador en la instancia (A-101, P-001, L)
+% para mostrarlo igual en la salida.
 registrar_original(Tipo, Norm, Orig) :-
     (   original(Tipo, Norm, _) -> true ; assertz(original(Tipo, Norm, Orig)) ).
 
@@ -218,17 +193,13 @@ procesar_con_seccion([L|Resto], N, SeccionActual) :-
 manejar_tipo(blanco, _N, Seccion, Seccion).
 manejar_tipo(comentario, _N, Seccion, Seccion).
 manejar_tipo(seccion(Nombre), _N, _SeccionVieja, Nombre).
-% CORREGIDO: si un registro no se puede procesar (seccion 'ninguna',
-% aridad o clave desconocida) ya no se falla en silencio: se lanza una
-% excepcion con el numero de linea. main.pl la traduce a error_instancia.
 manejar_tipo(registro(Campos), N, Seccion, Seccion) :-
     (   procesar_registro(Seccion, Campos, N)
     ->  true
     ;   throw(error_registro(N, Seccion, Campos))
     ).
 
-% ---------- CONFIG ----------
-
+% ---- CONFIG ----
 procesar_registro('CONFIG', [dias, Lista], _N) :- !, asertar_dias(Lista).
 procesar_registro('CONFIG', [franjas, NStr], _N) :- !,
     atomo_numero(NStr, N), assertz(num_franjas(N)).
@@ -237,16 +208,14 @@ procesar_registro('CONFIG', [inicio, HHMM], _N) :- !,
 procesar_registro('CONFIG', [duracion_franja, DStr], _N) :- !,
     atomo_numero(DStr, D), assertz(duracion_franja(D)).
 
-% ---------- AULA ----------
-
+% ---- AULA ----
 procesar_registro('AULA', [Cod, CapStr, Tipo], _N) :- !,
     normalizar_id(Cod, CodN),
     registrar_original(aula, CodN, Cod),
     atomo_numero(CapStr, Cap),
     assertz(aula(CodN, Cap, Tipo)).
 
-% ---------- PROFESOR ----------
-
+% ---- PROFESOR ----
 procesar_registro('PROFESOR', [Cod, Nombre, MaxStr, Disp], _N) :- !,
     normalizar_id(Cod, CodN),
     registrar_original(profesor, CodN, Cod),
@@ -254,8 +223,7 @@ procesar_registro('PROFESOR', [Cod, Nombre, MaxStr, Disp], _N) :- !,
     parsear_disponibilidad(Disp, DispParsed),
     assertz(profesor(CodN, Nombre, Max, DispParsed)).
 
-% ---------- CURSO ----------
-
+% ---- CURSO ----
 procesar_registro('CURSO', [Cod, Nombre, Grupo, InscStr, SemStr, DurStr, Requiere], _N) :- !,
     normalizar_id(Cod, CodN),
     normalizar_id(Grupo, GrupoN),
@@ -266,16 +234,14 @@ procesar_registro('CURSO', [Cod, Nombre, Grupo, InscStr, SemStr, DurStr, Requier
     atomo_numero(DurStr, Dur),
     assertz(grupo(CodN, GrupoN, Nombre, Insc, Sem, Dur, Requiere)).
 
-% ---------- IMPARTE ----------
-
+% ---- IMPARTE ----
 procesar_registro('IMPARTE', [Curso, Grupo, Prof], _N) :- !,
     normalizar_id(Curso, CursoN),
     normalizar_id(Grupo, GrupoN),
     normalizar_id(Prof, ProfN),
     assertz(imparte(CursoN, GrupoN, ProfN)).
 
-% ---------- RESTRICCION (aridad variable segun el tipo) ----------
-
+% ---- RESTRICCION ----
 procesar_registro('RESTRICCION', [Tipo | Args], N) :- !,
     procesar_restriccion(Tipo, Args, N).
 
