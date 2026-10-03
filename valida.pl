@@ -1,11 +1,5 @@
-% ============================================================
 % valida.pl -- validacion de instancia con numeros de linea
-% Cubre los 9 errores exigidos por la seccion 5.9 del PDF.
-% Se consulta DESPUES de horarios.pl y ANTES de main.pl.
-%
-% Usa de horarios.pl: leer_lineas/2, clasificar_linea/2, split_on/3,
-%   normalizar_id/2, parsear_disponibilidad/2, extraer_dia_franja_atom/3
-% ============================================================
+% Se consulta despues de horarios.pl y antes de main.pl.
 
 valida(Path) :-
     leer_lineas(Path, Lineas),
@@ -16,9 +10,6 @@ valida(Path) :-
         throw(errores_instancia(Errores))
     ).
 
-% ------------------------------------------------------------
-% Recoleccion + validacion
-% ------------------------------------------------------------
 validar_lineas(Lineas, Errores) :-
     recolectar(Lineas, 1, ninguna, Registros, ErroresEstruct),
     validar_secciones_duplicadas(Lineas, ErroresSecc),
@@ -31,9 +22,7 @@ validar_lineas(Lineas, Errores) :-
                 ErroresDup, ErroresImp], Errores0),
     sort(Errores0, Errores).
 
-% ------------------------------------------------------------
-% Pase 1: recolectar registros y errores estructurales
-% ------------------------------------------------------------
+% ---- Recolectar registros y errores estructurales ----
 recolectar([], _, _, [], []).
 recolectar([L|Ls], N, Secc, Rs, Es) :-
     clasificar_linea(L, T),
@@ -50,7 +39,7 @@ recolectar_tipo(seccion(S),Ls, N, _, Rs, Es) :- !,
     ;   Es = [linea(N, seccion_desconocida(S))|Es1],
         recolectar(Ls, N1, desconocida, Rs, Es1)
     ).
-% los registros de una seccion desconocida se ignoran (ya se reporto la seccion)
+% Los registros de una seccion desconocida se ignoran.
 recolectar_tipo(registro(_), Ls, N, desconocida, Rs, Es) :- !,
     N1 is N+1,
     recolectar(Ls, N1, desconocida, Rs, Es).
@@ -65,7 +54,7 @@ seccion_conocida('CONFIG').    seccion_conocida('AULA').
 seccion_conocida('PROFESOR').  seccion_conocida('CURSO').
 seccion_conocida('IMPARTE').   seccion_conocida('RESTRICCION').
 
-% Un encabezado de seccion puede aparecer a lo sumo una vez (5.1)
+% Un encabezado de seccion puede aparecer a lo sumo una vez.
 validar_secciones_duplicadas(Lineas, Errores) :-
     encabezados(Lineas, 1, Encs),
     findall(linea(N, seccion_duplicada(S)),
@@ -83,9 +72,7 @@ encabezados([L|Ls], N, Encs) :-
     ),
     encabezados(Ls, N1, Resto).
 
-% ------------------------------------------------------------
-% Pase 2: CONFIG (todas las claves obligatorias, exactamente una vez)
-% ------------------------------------------------------------
+% ---- CONFIG: claves obligatorias, exactamente una vez ----
 validar_config(Registros, Errores) :-
     findall(N-C, member(reg('CONFIG',N,C), Registros), Configs),
     findall(linea(N,R), ( member(N-C, Configs), err_config(C, R), R \== ok ),
@@ -120,7 +107,7 @@ err_config([K,_], R) :- atom(K), !,
     R = clave_config_desconocida(K).
 err_config(C, aridad_config(C)).
 
-% exactamente 1 caracter (no espacio) por dia
+% Un caracter (no espacio) por dia.
 dias_atom_valido(Atom) :-
     atom_chars(Atom, Chars),
     split_on(',', Chars, Listas),
@@ -136,18 +123,13 @@ hora_valida(Atom) :-
     atom_chars(MA, [M1,M2]), safe_int(MA, M),
     H >= 0, H =< 23, M >= 0, M =< 59.
 
-% CORREGIDO: atom_chars entrega caracteres ('0'), no codigos; hay que
-% convertirlos antes de comparar (antes lanzaba type_error(evaluable,...)).
 digit(C) :-
     char_code(C, K),
     K >= 0'0, K =< 0'9.
 
-% ------------------------------------------------------------
-% Universo de entidades declaradas (para validar referencias)
-% Los ids se guardan NORMALIZADOS (a_101, p_001, ic_1802-c1), que es
-% lo que horarios.pl asserta despues.
+% ---- Universo de entidades declaradas ----
+% Los ids se guardan normalizados (a_101, p_001, ic_1802-c1).
 %   u(Dias, NF, Aulas, Profs, Grupos, Durs)   Durs = [C-G-Dur, ...]
-% ------------------------------------------------------------
 universo(Registros, u(Dias, NF, Aulas, Profs, Grupos, Durs)) :-
     (   member(reg('CONFIG',_,[dias, DAtom]), Registros), DAtom \== ''
     ->  dias_del_atom(DAtom, Dias0), sort(Dias0, Dias)
@@ -180,9 +162,7 @@ dias_del_atom(Atom, Dias) :-
                 atom_chars(A, L), normalizar_id(A, D)),
             Dias).
 
-% ------------------------------------------------------------
-% Pase 3: cada registro de datos
-% ------------------------------------------------------------
+% ---- Registros de datos ----
 validar_datos(Registros, U, Errores) :-
     findall(linea(N,R),
             ( member(reg(S,N,Campos), Registros),
@@ -262,8 +242,7 @@ err_restriccion(excluyentes, [C1,G1,C2,G2], U, R) :- !,
     ;   R = ok
     ).
 
-% prefiere: ademas de dia/franja validos, la sesion que EMPIEZA en esa
-% franja no puede exceder la ultima franja del dia (5.9, ultimo error).
+% prefiere: la sesion que empieza en esa franja no puede exceder el dia.
 err_restriccion(prefiere, [C,G,DF,W], U, R) :- !,
     normalizar_id(C,CN), normalizar_id(G,GN),
     U = u(Dias, NF, _, _, Grupos, Durs),
@@ -286,9 +265,7 @@ err_restriccion(compacta, [C,G,W], U, R) :- !,
 
 err_restriccion(T, A, _, aridad_restriccion(T, A)).
 
-% ------------------------------------------------------------
-% Pase 4: duplicados (curso, grupo), aulas y profesores
-% ------------------------------------------------------------
+% ---- Duplicados: (curso, grupo), aulas y profesores ----
 validar_duplicados(Registros, Errores) :-
     findall(CN-GN-N, (member(reg('CURSO',N,[C,_,G|_]), Registros),
                       normalizar_id(C,CN), normalizar_id(G,GN)),
@@ -313,9 +290,7 @@ duplicados_id(Seccion, Etiqueta, Registros, Errores) :-
             Errores0),
     sort(Errores0, Errores).
 
-% ------------------------------------------------------------
-% Pase 5: todo grupo debe tener al menos un profesor en IMPARTE (5.6)
-% ------------------------------------------------------------
+% ---- Todo grupo debe tener al menos un profesor en IMPARTE ----
 validar_cobertura_imparte(Registros, Errores) :-
     findall(linea(N, grupo_sin_profesor(CN-GN)),
             ( member(reg('CURSO',N,[C,_,G|_]), Registros),
@@ -326,20 +301,16 @@ validar_cobertura_imparte(Registros, Errores) :-
             Errores0),
     sort(Errores0, Errores).
 
-% ------------------------------------------------------------
-% Predicados auxiliares
-% ------------------------------------------------------------
+% ---- Auxiliares ----
 tipo_valido(teoria). tipo_valido(laboratorio). tipo_valido(mixta).
 
-% concatenar(+ListaDeListas, -Lista)
-% GNU Prolog no trae append/2 (solo append/3), asi que se define aqui.
+% GNU Prolog no trae append/2, solo append/3.
 concatenar([], []).
 concatenar([L|Ls], R) :-
     concatenar(Ls, R0),
     append(L, R0, R).
 
-% Solo digitos decimales: rechaza vacios, negativos, decimales y
-% sintaxis que number_codes/2 aceptaria (0x10, 0'a, 1.0e3, ...).
+% Solo digitos decimales: number_codes/2 aceptaria 0x10, 0'a o 1.0e3.
 safe_int(Atom, N) :-
     atom(Atom), Atom \== '',
     atom_chars(Atom, Cs),
@@ -350,7 +321,7 @@ safe_int(Atom, N) :-
 int_positivo(A, N) :- safe_int(A, N), N > 0.
 int_no_neg(A, N)  :- safe_int(A, N), N >= 0.
 
-% disponibilidad: dias declarados en CONFIG y franjas dentro de 1..NF
+% Dias declarados en CONFIG y franjas dentro de 1..NF.
 disponibilidad_valida('', _, _) :- !.
 disponibilidad_valida(Atom, Dias, NF) :-
     NF > 0,
@@ -365,9 +336,7 @@ dia_franja_valida(Atom, Dias, NF) :-
     catch(extraer_dia_franja_atom(Atom, D, F), _, fail),
     member(D, Dias), integer(F), F >= 1, F =< NF.
 
-% ------------------------------------------------------------
-% Reporte de errores
-% ------------------------------------------------------------
+% ---- Reporte de errores ----
 reportar(Errores) :-
     length(Errores, N),
     format(user_error, "Instancia invalida: ~w error(es)~n", [N]),
