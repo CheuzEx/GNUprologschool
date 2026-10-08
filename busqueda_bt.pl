@@ -3,43 +3,16 @@
 % estrategias de backtracking.
 %
 % Se carga despues de horarios.pl (usa sus hechos dinamicos).
-%
-% Estrategias (buscar/4):
-%   bt_gp : generar y probar (linea base, sin ninguna poda)
-%   bt    : verificacion anticipada. Opciones:
-%             heuristica(original | grado | demanda | mrv | lcv)
-%             simetria(no | si | intra | inter)      (por defecto no)
-%             limite(N)            (maximo de nodos, por defecto 1000000)
-%           original/grado/demanda: orden estatico de variables.
-%           mrv = forward checking + minimum remaining values
-%                 (desempate por grado).
-%           lcv = forward checking + orden estatico de variables +
-%                 valor menos restrictivo (least constraining value).
-%           Cualquier otra heuristica (ff, ffc, ...) es el orden original.
-%   clpfd : delega en buscar_fd/4 (definido en busqueda_fd.pl).
-%
-% Reduccion de simetria (opcion simetria):
-%   intra : las sesiones de un mismo grupo se ordenan en el tiempo
-%           (la de indice menor va antes).
-%   inter : para grupos EQUIVALENTES (mismo profesor, inscritos,
-%           sesiones, duracion y tipo, y sin restricciones declaradas)
-%           se fija el orden de sus primeras sesiones.
-%   si    : intra + inter.
-%
-% Resultado de resolver/3:
-%   solucion(Horario) | sin_solucion(Razon) | limite_alcanzado
-% Horario = lista de asignacion(Curso,Grupo,Prof,Aula,Dia,Franja,Dur),
-% el mismo formato de la salida legible por maquina (seccion 6.5).
 % ============================================================
 
 :- dynamic(pos_dia/2).
 :- dynamic(equiv_g/4).       % equiv_g(C1,G1,C2,G2): grupos equivalentes, C1-G1 @< C2-G2
 
 % ------------------------------------------------------------
-% Preparacion: posicion cronologica de cada dia (l=1, m=2, ...)
-% y grupos equivalentes (para la simetria entre grupos)
+% Preparacion
 % ------------------------------------------------------------
 
+% Numera los dias (l=1, m=2, ...) y calcula grupos equivalentes.
 preparar :-
     retractall(pos_dia(_, _)),
     retractall(equiv_g(_, _, _, _)),
@@ -53,6 +26,7 @@ numerar_dias([D|Ds], K) :-
     K1 is K + 1,
     numerar_dias(Ds, K1).
 
+% Convierte dia + franja en un unico numero comparable.
 tiempo(D, F, T) :-
     pos_dia(D, K),
     T is K * 1000 + F.
@@ -64,8 +38,8 @@ preparar_equivalencias :-
              grupos_equivalentes(C1, G1, C2, G2) ),
            assertz(equiv_g(C1, G1, C2, G2))).
 
-% Intercambiar por completo los horarios de dos grupos equivalentes
-% produce otra solucion valida y del mismo costo.
+% Dos grupos son equivalentes si tienen mismos datos, profesor y
+% ninguna restriccion propia: intercambiar sus horarios da otra solucion.
 grupos_equivalentes(C1, G1, C2, G2) :-
     grupo(C1, G1, _, Insc, Sem, Dur, Req),
     grupo(C2, G2, _, Insc, Sem, Dur, Req),
@@ -104,7 +78,7 @@ sesiones_de_grupo(I, Sem, C, G, P, Dur, Id0, Id, [sesion(Id0, C, G, I, P, Dur)|L
     I1 is I + 1,
     sesiones_de_grupo(I1, Sem, C, G, P, Dur, Id1, Id, L, Resto).
 
-% Solo se usa el primer profesor declarado (extension: varios profesores).
+% Solo se usa el primer profesor declarado.
 profesor_de(C, G, P) :-
     (   imparte(C, G, P0) -> P = P0
     ;   throw(error_datos(sin_profesor(C, G)))
@@ -112,11 +86,11 @@ profesor_de(C, G, P) :-
 
 % ------------------------------------------------------------
 % dominio(+Sesion, -Dominio)
-% Lista de v(Aula, Dia, FranjaInicio) que ya cumplen: capacidad, tipo,
-% aula_fija, prohibida y disponibilidad del profesor en TODAS las
-% franjas que cubre la sesion (mas estricto que "en la franja de inicio").
-% El maximo de franjas del profesor no depende de la asignacion (la carga
-% es constante), por eso se comprueba en diagnostico_previo/2 y verifica/1.
+% Devuelve todos los v(Aula, Dia, FranjaInicio) validos para la sesion:
+% capacidad, tipo de aula, aula_fija, prohibida y disponibilidad del
+% profesor en TODAS las franjas que cubre la sesion.
+% El maximo de franjas del profesor no depende de la asignacion, asi que
+% se comprueba en diagnostico_previo/2 y en verifica/1.
 % ------------------------------------------------------------
 
 dominio(sesion(_, C, G, _, P, Dur), Dominio) :-
@@ -163,8 +137,8 @@ franja_cubierta(Disp, D, Fk) :-
     !.
 
 % ------------------------------------------------------------
-% Conflictos entre dos sesiones ya asignadas (restricciones duras
-% de a pares). Es lo que usa la busqueda con verificacion anticipada.
+% Conflictos entre dos sesiones ya asignadas. Es lo que usa la
+% verificacion anticipada.
 % ------------------------------------------------------------
 
 solapan(F1, Dur1, F2, Dur2) :-
@@ -174,9 +148,9 @@ solapan(F1, Dur1, F2, Dur2) :-
 incompatibles(sesion(_, C1, G1, _, P1, Dur1), v(A1, Dia, F1),
               sesion(_, C2, G2, _, P2, Dur2), v(A2, Dia, F2)) :-
     solapan(F1, Dur1, F2, Dur2),
-    (   A1 == A2                      % mismo aula
-    ;   P1 == P2                      % mismo profesor
-    ;   C1-G1 == C2-G2                % mismo grupo
+    (   A1 == A2
+    ;   P1 == P2
+    ;   C1-G1 == C2-G2
     ;   excluyentes_par(C1, G1, C2, G2)
     ),
     !.
@@ -192,8 +166,8 @@ excluyentes_par(C1, G1, C2, G2) :-
 % verifica/1 NO las exige)
 % ------------------------------------------------------------
 
-% Mecanismo 1 (intra-grupo): las sesiones de un mismo grupo son
-% intercambiables, asi que la de indice menor va antes en el tiempo.
+% Intra-grupo: las sesiones de un mismo grupo son intercambiables,
+% asi que la de indice menor va antes en el tiempo.
 rompe_intra(sesion(_, C, G, I1, _, _), v(_, D1, F1),
             sesion(_, C, G, I2, _, _), v(_, D2, F2)) :-
     I1 \== I2,
@@ -201,10 +175,9 @@ rompe_intra(sesion(_, C, G, I1, _, _), v(_, D1, F1),
     tiempo(D2, F2, T2),
     (   I1 < I2 -> T1 >= T2 ; T1 =< T2 ).
 
-% Mecanismo 2 (inter-grupo): dos grupos equivalentes (equiv_g/4) se pueden
-% intercambiar enteros; se fija que la primera sesion del grupo menor
-% (en orden de terminos) vaya antes que la del otro. Comparten profesor,
-% asi que nunca coinciden en el tiempo.
+% Inter-grupo: se fija que la primera sesion del grupo menor vaya antes
+% que la del grupo equivalente mayor. Comparten profesor, asi que nunca
+% coinciden en el tiempo.
 rompe_inter(sesion(_, C1, G1, 1, _, _), v(_, D1, F1),
             sesion(_, C2, G2, 1, _, _), v(_, D2, F2)) :-
     tiempo(D1, F1, T1),
@@ -256,14 +229,13 @@ elegir(V, Dom) :-
 % Unico punto de entrada; busqueda_fd.pl aporta buscar_fd/4.
 % ------------------------------------------------------------
 
-% Estrategia 1: generar y probar
-% Asigna TODAS las sesiones y solo entonces verifica con verifica/1.
+% Generar y probar: asigna todas las sesiones y luego verifica.
 buscar(bt_gp, _Opc, Pares, Sol) :- !,
     generar(Pares, Sol),
     a_horario(Sol, Horario),
     verifica(Horario).
 
-% Estrategia 2: verificacion anticipada
+% Verificacion anticipada.
 buscar(bt, Opc, Pares, Sol) :- !,
     opcion(heuristica, Opc, original, H),
     opcion(simetria, Opc, no, Sim),
@@ -274,7 +246,7 @@ buscar(bt, Opc, Pares, Sol) :- !,
     ;   buscar_anticipada(Pares, Sim, [], Sol)
     ).
 
-% Estrategia 3: dominios finitos (busqueda_fd.pl)
+% Dominios finitos (definido en busqueda_fd.pl).
 buscar(clpfd, Opc, Pares, Sol) :- !,
     buscar_fd(Opc, Pares, Sol).
 
@@ -327,8 +299,8 @@ quitar_par(S-_, [S2-D2|Ps], Resto) :-
     ;   Resto = [S2-D2|R], quitar_par(S-_, Ps, R)
     ).
 
-% Orden de valores. lcv: primero el valor que descarta MENOS valores de
-% los dominios de las sesiones pendientes (keysort es estable).
+% lcv: primero el valor que descarta MENOS valores de los dominios
+% pendientes (keysort es estable).
 ordenar_valores(orig, Dom, _, _, _, Dom) :- !.
 ordenar_valores(lcv, Dom, S, Resto, Sim, DomOrd) :-
     findall(K-W,
@@ -372,8 +344,7 @@ ordenar(grado, Pares, Ordenados) :- !,
     ordenar_por(grado, Pares, Ordenados).
 ordenar(demanda, Pares, Ordenados) :- !,
     ordenar_por(demanda, Pares, Ordenados).
-% CORREGIDO: cualquier otra heuristica (ff, ffc, lcv, ...) conserva el
-% orden original. Antes faltaba esta clausula y ordenar/3 fallaba.
+% Cualquier otra heuristica conserva el orden original.
 ordenar(_, Pares, Pares).
 
 ordenar_por(Criterio, Pares, Ordenados) :-
@@ -390,7 +361,7 @@ claves([S-Dom|Ps], Criterio, Todas, [K-(S-Dom)|Ks]) :-
     clave(Criterio, S, Todas, K),
     claves(Ps, Criterio, Todas, Ks).
 
-% Mayor grado primero (mas sesiones con las que puede chocar)
+% Mayor grado primero (mas sesiones con las que puede chocar).
 clave(grado, sesion(Id, C, G, _, P, _), Todas, k(NegGrado, Id)) :-
     findall(x,
             (   member(sesion(Id2, C2, G2, _, P2, _), Todas),
@@ -400,7 +371,7 @@ clave(grado, sesion(Id, C, G, _, P, _), Todas, k(NegGrado, Id)) :-
             L),
     length(L, Grado),
     NegGrado is -Grado.
-% Mas inscritos primero, luego mayor duracion
+% Mas inscritos primero, luego mayor duracion.
 clave(demanda, sesion(Id, C, G, _, _, Dur), _, k(NegInsc, NegDur, Id)) :-
     grupo(C, G, _, Insc, _, _, _),
     NegInsc is -Insc,
@@ -454,12 +425,12 @@ pares_con_dominio([S|Ss], [S-Dom|Ps]) :-
     pares_con_dominio(Ss, Ps).
 
 % ------------------------------------------------------------
-% Razones por las que la instancia es imposible sin buscar nada
-% (inconsistencia por construccion, seccion 11.3). Primero las
-% comprobaciones baratas y al final las que calculan dominios.
+% Razones por las que la instancia es imposible sin buscar nada.
+% Primero las comprobaciones baratas y al final las que calculan
+% dominios.
 % ------------------------------------------------------------
 
-% un grupo con mas sesiones semanales de las que caben sin solaparse
+% Un grupo tiene mas sesiones semanales de las que caben sin solaparse.
 diagnostico_previo(_, grupo_excede_franjas(C, G, Sem, Max)) :-
     grupo(C, G, _, _, Sem, Dur, _),
     num_franjas(NF),
@@ -467,20 +438,20 @@ diagnostico_previo(_, grupo_excede_franjas(C, G, Sem, Max)) :-
     Max is ND * (NF // Dur),
     Sem > Max,
     !.
-% un profesor con mas franjas que su maximo
+% Un profesor supera su maximo de franjas.
 diagnostico_previo(Sesiones, carga_profesor(P, Carga, Max)) :-
     profesor(P, _, Max, _),
     carga_de(P, Sesiones, Carga),
     Carga > Max,
     !.
-% un profesor sin disponibilidad suficiente para lo que imparte
+% Un profesor no tiene disponibilidad suficiente para lo que imparte.
 diagnostico_previo(Sesiones, disponibilidad_insuficiente(P, Carga, Disponibles)) :-
     profesor(P, _, _, Disp),
     carga_de(P, Sesiones, Carga),
     franjas_disponibles(Disp, Disponibles),
     Carga > Disponibles,
     !.
-% una sesion sin ningun valor posible (capacidad, tipo, aula_fija, ...)
+% Una sesion sin ningun valor posible (capacidad, tipo, aula_fija, ...).
 diagnostico_previo(Sesiones, dominio_vacio(C, G, I)) :-
     member(S, Sesiones),
     S = sesion(_, C, G, I, _, _),
@@ -491,7 +462,7 @@ carga_de(P, Sesiones, Carga) :-
     findall(Dur, member(sesion(_, _, _, _, P, Dur), Sesiones), Ds),
     suma(Ds, Carga).
 
-% numero de celdas (dia, franja) en las que el profesor esta disponible
+% Numero de celdas (dia, franja) en las que el profesor esta disponible.
 franjas_disponibles(total, N) :- !,
     num_franjas(NF),
     findall(D, dia(D), Ds), length(Ds, ND),
@@ -576,65 +547,68 @@ celdas(H, Celdas) :-
             ),
             Celdas).
 
-% cada grupo tiene sus sesiones semanales
+% Cada grupo tiene sus sesiones semanales.
 violacion(H, _, sesiones_incorrectas(C, G, Esperadas, Reales)) :-
     grupo(C, G, _, _, Esperadas, _, _),
     findall(x, member(asignacion(C, G, _, _, _, _, _), H), L),
     length(L, Reales),
     Reales =\= Esperadas.
-% la asignacion es coherente con los datos (grupo, profesor, duracion, aula)
+% La asignacion es coherente con los datos.
 violacion(H, _, asignacion_invalida(C, G, P, A)) :-
     member(asignacion(C, G, P, A, _, _, Dur), H),
     (   \+ ( grupo(C, G, _, _, _, Dur, _), imparte(C, G, P) )
     ;   \+ aula(A, _, _)
     ).
-% dentro del rango de dias y franjas
+% Dentro del rango de dias y franjas.
 violacion(H, _, fuera_de_rango(C, G, D, F)) :-
     member(asignacion(C, G, _, _, D, F, Dur), H),
     num_franjas(NF),
     (   \+ dia(D) ; F < 1 ; F + Dur - 1 > NF ).
-% capacidad
+% Capacidad.
 violacion(H, _, capacidad(C, G, A)) :-
     member(asignacion(C, G, _, A, _, _, _), H),
     grupo(C, G, _, Insc, _, _, _),
     aula(A, Cap, _),
     Insc > Cap.
-% tipo de aula
+% Tipo de aula.
 violacion(H, _, tipo_aula(C, G, A)) :-
     member(asignacion(C, G, _, A, _, _, _), H),
     grupo(C, G, _, _, _, _, Req),
     aula(A, _, Tipo),
     \+ tipo_compatible(Req, Tipo).
-% disponibilidad del profesor
+% Disponibilidad del profesor.
 violacion(H, _, disponibilidad(P, D, F)) :-
     member(asignacion(_, _, P, _, D, F, Dur), H),
     \+ profesor_disponible(P, D, F, Dur).
-% maximo de franjas del profesor
+% Maximo de franjas del profesor.
 violacion(H, _, max_franjas(P, Carga, Max)) :-
     profesor(P, _, Max, _),
     findall(Dur, member(asignacion(_, _, P, _, _, _, Dur), H), Ds),
     suma(Ds, Carga),
     Carga > Max.
-% aula_fija
+% aula_fija.
 violacion(H, _, aula_fija(C, G, A)) :-
     aula_fija(C, G, _),
     member(asignacion(C, G, _, A, _, _, _), H),
     \+ aula_fija(C, G, A).
-% prohibida
+% prohibida.
 violacion(H, _, prohibida(C, G, D, FP)) :-
     prohibida(C, G, D, FP),
     member(asignacion(C, G, _, _, D, F, Dur), H),
     FP >= F,
     FP < F + Dur.
-% solapamientos de aula, profesor y grupo (celdas repetidas)
+% Solapamientos de aula, profesor y grupo (celdas repetidas).
 violacion(_, Celdas, solape(T, R, D, F)) :-
     msort(Celdas, Ord),
     duplicado(Ord, c(T, R, D, F)).
-% excluyentes
+% excluyentes.
 violacion(_, Celdas, excluyentes(C1, G1, C2, G2, D, F)) :-
     excluyentes(C1, G1, C2, G2),
     member(c(grupo, C1-G1, D, F), Celdas),
     member(c(grupo, C2-G2, D, F), Celdas).
+
+duplicado([X, Y|_], X) :- X == Y.
+duplicado([_|R], X) :- duplicado(R, X).
 
 duplicado([X, Y|_], X) :- X == Y.
 duplicado([_|R], X) :- duplicado(R, X).
