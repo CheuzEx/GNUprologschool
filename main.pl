@@ -1,9 +1,9 @@
-% main/3: uso interactivo, informa el codigo de salida y no termina el proceso.
+% main/3: uso interactivo; informa el codigo de salida y no termina el proceso.
 main(Instancia, Salida, Estrategia) :-
     main_codigo(Instancia, Salida, Estrategia, Codigo),
     format("Codigo de salida: ~w~n", [Codigo]).
 
-% main_cli/3: uso desde la linea de comandos, termina con el codigo de salida.
+% main_cli/3: uso desde la linea de comandos; termina con el codigo de salida.
 main_cli(Instancia, Salida, Estrategia) :-
     main_codigo(Instancia, Salida, Estrategia, Codigo),
     halt(Codigo).
@@ -30,7 +30,7 @@ ordenar_resultado(solucion(H0), solucion(H)) :- !,
     ordenar_asignaciones(H0, H).
 ordenar_resultado(R, R).
 
-% Orden: curso, grupo, posicion del dia segun CONFIG, franja.
+% Ordena por curso, grupo, dia (segun CONFIG) y franja.
 ordenar_asignaciones(H0, H) :-
     findall(D, dia(D), Dias),
     findall(k(C,G,I,F)-asignacion(C,G,P,A,D,F,Dur),
@@ -257,7 +257,7 @@ linea_optimo(S, Opc) :-
     ;   true
     ).
 
-% Una global sin asignar vale 0 en GNU Prolog, por eso se valida el valor.
+% Valida opt_optimo; en GNU Prolog una global sin asignar vale 0.
 estado_optimo(O) :-
     (   catch(g_read(opt_optimo, O0), _, fail),
         memberchk(O0, [si, no, n_a])
@@ -301,8 +301,7 @@ escribir_diagnostico(S, Razon) :-
 suma_prods([], 0).
 suma_prods([X|Xs], T) :- suma_prods(Xs, T0), V is X, T is T0 + V.
 
-% Restriccion culpable: se quita cada restriccion dura declarada sola y
-% se resuelve de nuevo; los hechos se restauran al terminar.
+% Prueba quitando una restriccion dura a la vez para ver si la instancia se resuelve.
 escribir_culpables(S) :-
     restricciones_culpables(Cs),
     (   Cs == []
