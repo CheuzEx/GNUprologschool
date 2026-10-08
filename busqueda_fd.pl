@@ -14,14 +14,13 @@
 %           simetria(no|si|intra|inter)   limite(N)   optimizar
 %           labeling(propio|fd)   (por defecto propio)
 %             propio : etiquetado propio; cuenta nodos y respeta limite(N).
-%             fd     : fd_labeling/2 de GNU Prolog (8.2/8.3). NO respeta
-%                      limite(N) ni cuenta nodos (nodos queda en 0); solo
-%                      registra los retrocesos con la opcion backtracks(B).
-%                      Con optimizar se ignora: el B&B siempre usa el
-%                      etiquetado propio (necesita la cota inferior).
+%             fd     : fd_labeling/2 de GNU Prolog. NO respeta limite(N)
+%                      ni cuenta nodos (nodos queda en 0); solo registra
+%                      retrocesos con backtracks(B). Con optimizar se
+%                      ignora: el B&B siempre usa el etiquetado propio.
 %
 % NOTAS
-%  - GNU Prolog trae el solver FD incorporado: NO hay que importar
+%  - GNU Prolog trae el solver FD incorporado: no hay que importar
 %    ninguna biblioteca (library(clpfd) es de SWI-Prolog).
 %  - Reutiliza de busqueda_bt.pl: opcion/4, excluyentes_par/4, suma/2,
 %    contar_nodo/0, ordenar/3, a_horario/2, sim_intra/1, sim_inter/1,
@@ -29,42 +28,35 @@
 %    (de main.pl).
 %
 % MODELO
-%  Por cada sesion una UNICA variable de decision X en 1..N, donde N es
-%  el tamano de su dominio precalculado (dominio/2: capacidad, tipo,
-%  aula_fija, prohibida y disponibilidad ya aplicados). Con fd_element/3
-%  se obtienen, en forma extensional, dos variables derivadas:
-%      A = indice del aula          T = dia*K + franja     (K = franjas+1)
-%  T es un "tiempo absoluto": como cada sesion cabe en su dia, dos
-%  intervalos [T, T+Dur) de dias distintos nunca se solapan, asi que el
-%  no-solapamiento es una sola disyuncion lineal.
+%  Una variable X por sesion, en 1..N (N = tamano de su dominio
+%  precalculado por dominio/2). Con fd_element/3 se obtienen dos
+%  variables derivadas: A = indice del aula, T = dia*K + franja.
+%  T es un "tiempo absoluto": dos intervalos [T, T+Dur) de dias
+%  distintos nunca se solapan, asi que el no-solapamiento es una sola
+%  disyuncion lineal.
 %
-%  Restricciones (por pares de sesiones):
+%  Restricciones por pares de sesiones:
 %   - mismo profesor / mismo grupo / excluyentes:
 %         T1+Dur1 =< T2  \/  T2+Dur2 =< T1
-%   - resto de pares con aulas en comun (no expresable solo con tablas):
-%         (A1 = A2)  ==>  (no solape)          [reificacion]
+%   - pares que comparten aulas: (A1 = A2) ==> (no solape)
 %   - redundantes con fd_all_different/1 (refuerzan la propagacion):
-%         T distintos por profesor, T distintos por grupo, y
-%         A*Big+T distintos en todo el sistema (misma aula + mismo inicio
-%         implica solape).
+%         T distintos por profesor, T distintos por grupo y
+%         A*Big+T distintos en todo el sistema.
 %   - simetria: T1 < T2 (intra-grupo e inter-grupo equivalente).
-%   El maximo de franjas del profesor es constante (suma de duraciones):
-%   se comprueba en diagnostico_previo/2 y en verifica/1.
+%  El maximo de franjas del profesor es constante (suma de duraciones):
+%  se comprueba en diagnostico_previo/2 y en verifica/1.
 %
-% HEURISTICAS (etiquetado propio, para poder contar nodos y aplicar el
-% limite; fd_labeling/2 no tiene opcion de limite)
+% HEURISTICAS (etiquetado propio; fd_labeling/2 no tiene limite)
 %   original|grado|demanda : primera variable pendiente (el orden lo da
 %                            ordenar/3 en resolver/3)
-%   ff, mrv                : menor dominio primero (first-fail). Como hay
-%                            una variable por sesion, su tamano ES el
-%                            numero de valores restantes: ff == MRV.
-%   ffc                    : ff con desempate por grado (las sesiones se
-%                            reordenan por grado antes de etiquetar; con
-%                            labeling(fd) el desempate lo hace GNU Prolog
-%                            por numero de restricciones de la variable)
-%   lcv                    : ff + valor menos restrictivo: se prueba cada
-%                            valor propagando y se elige el que deja mas
-%                            valores en las demas sesiones.
+%   ff, mrv                : menor dominio primero. Como hay una variable
+%                            por sesion, su tamano ES el numero de valores
+%                            restantes: ff == MRV.
+%   ffc                    : ff con desempate por grado (se reordena por
+%                            grado antes de etiquetar; con labeling(fd)
+%                            el desempate lo hace GNU Prolog por numero
+%                            de restricciones de la variable).
+%   lcv                    : ff + valor menos restrictivo.
 % ============================================================
 
 :- dynamic(fd_indice/3).      % fd_indice(aula|dia, Indice, Codigo)
@@ -97,22 +89,15 @@ etiquetar_segun(propio, _H, Xs, MV, MVal, Poda) :- !,
 etiquetar_segun(fd, H, Xs, _MV, _MVal, _Poda) :- !,
     fd_labeling_opts(H, Opts),
     % backtracks(B) es de SALIDA: unifica B con los retrocesos ocurridos.
-    % No sirve como limite (fd_labeling/2 no tiene opcion de limite).
     fd_labeling(Xs, [backtracks(B)|Opts]),
     g_assign(retrocesos, B).
 etiquetar_segun(Otro, _, _, _, _, _) :-
     throw(error_argumentos(labeling(Otro))).
 
 % fd_labeling_opts(+Heuristica, -Opciones)
-% Equivalencia con las opciones de fd_labeling/2 (justificar en el informe):
-%   original : leftmost + up (valores por defecto)
-%   mrv, ff  : variable_method(ff) (menor dominio; con una variable por sesion, el tamano
-%              del dominio ES el numero de valores restantes: ff == MRV)
-%   ffc      : GNU Prolog 1.4.5 no expone el desempate por restricciones;
-%              se usa ff como aproximacion para fd_labeling
-%   grado, demanda : el orden lo fija ordenar/3 antes de buscar; el
-%              etiquetado es leftmost sobre esa lista (aproximacion)
-%   lcv      : GNU Prolog no lo expone; solo existe en etiquetado propio
+%   original, grado, demanda : leftmost + up (el orden lo fija ordenar/3)
+%   mrv, ff, ffc             : variable_method(ff)
+%   lcv                      : no existe en fd_labeling; solo en propio
 fd_labeling_opts(original, []) :- !.
 fd_labeling_opts(grado,    []) :- !.
 fd_labeling_opts(demanda,  []) :- !.
@@ -181,7 +166,7 @@ xs_de([fv(_, X, _, _, _, _)|Vs], [X|Xs]) :- xs_de(Vs, Xs).
 
 % ------------------------------------------------------------
 % Restricciones de a pares
-% (no usar forall/findall para POSTEAR restricciones: deshacen los
+% (no usar forall/findall para postear restricciones: deshacen los
 %  efectos; por eso todo se hace con recursion explicita)
 % ------------------------------------------------------------
 fd_pares([], _).
@@ -287,10 +272,9 @@ todos_distintos(Ts) :-
 % Etiquetado propio (cuenta nodos y retrocesos, respeta el limite)
 %
 %   etiquetar(+Xs, +ModoVariable, +ModoValor, +Poda)
-%   Poda = none | bb(Vars)   (bb: branch and bound, ver mas abajo)
+%   Poda = none | bb(Vars)   (bb: branch and bound)
 %
-% Cada decision es binaria:  X = W   o   X =\= W  (W = valor elegido).
-% contar_nodo/0 lanza limite_alcanzado al superar el limite.
+% Cada decision es binaria: X = W  o  X =\= W.
 % ------------------------------------------------------------
 etiquetar(Xs, MV, MVal, Poda) :-
     pendientes(Xs, Ps),
@@ -330,7 +314,7 @@ mejor_ff([X|Xs], M, S, Mejor) :-
 % up: valor minimo del dominio
 elegir_valor(up, X, _, W) :-
     fd_min(X, W).
-% lcv: el valor que, tras propagar, deja mas valores en las demas variables
+% lcv: valor que, tras propagar, deja mas valores en las demas variables
 elegir_valor(lcv, X, Ps, W) :-
     fd_min(X, Min),
     fd_max(X, Max),
@@ -350,7 +334,7 @@ suma_tamanos([V|Vs], S) :-
     S is S0 + T.
 
 % ------------------------------------------------------------
-% Reconstruir solucion (mismo formato interno que busqueda_bt.pl:
+% Reconstruir solucion (mismo formato que busqueda_bt.pl:
 % lista de Sesion-v(Aula, Dia, Franja))
 % ------------------------------------------------------------
 reconstruir([], [], []).
@@ -366,20 +350,18 @@ enesimo(N, [X|Xs], E) :-
 % ------------------------------------------------------------
 % Optimizacion de restricciones blandas: branch and bound
 %
-% Se recorre el arbol de etiquetado. En cada nodo se calcula una COTA
-% INFERIOR del costo (cota_inferior/2) y se poda si LB >= mejor costo
-% conocido. Al llegar a una hoja se calcula el costo exacto con
-% costo_blandas/2 (main.pl); si mejora, se guarda y se sigue buscando
-% (fail) hasta agotar el arbol o hallar costo 0.
+% En cada nodo se calcula una COTA INFERIOR del costo y se poda si
+% LB >= mejor costo conocido. Al llegar a una hoja se calcula el costo
+% exacto con costo_blandas/2 (main.pl); si mejora, se guarda y se sigue
+% buscando (fail) hasta agotar el arbol o hallar costo 0.
 %
-% Cota inferior (siempre valida):
+% Cota inferior:
 %   prefiere : W si NINGUNA sesion del grupo puede ya comenzar en esa
-%              franja (asignadas: no empiezan ahi; pendientes: la
-%              propagacion descarta el valor).
+%              franja.
 %   compacta : W * huecos del grupo, solo cuando todas sus sesiones ya
-%              estan asignadas (antes puede bajar al llenarse huecos).
+%              estan asignadas.
 %
-% Al terminar se deja en opt_optimo:
+% Al terminar deja en opt_optimo:
 %   si : el arbol se agoto (o se hallo costo 0) => solucion OPTIMA
 %   no : se alcanzo el limite con una solucion en mano => mejor conocida
 %   n_a: no se uso optimizacion
@@ -481,8 +463,8 @@ grupo_asig([fv(sesion(_, C0, G0, _, P, Dur), X, _, _, Dom, _)|Vs], C, G, H) :-
 
 % ------------------------------------------------------------
 % Tamano del vector de bits de los dominios FD.
-% Por defecto GNU Prolog usa 127: un dominio con valores mayores (p. ej.
-% X en 1..N con N > 127, o A*Big+T) se aproxima por intervalo y emite
+% Por defecto GNU Prolog usa 127. Si algun dominio tiene valores mayores
+% (p. ej. A*Big+T), se aproxima por intervalo y avisa con
 % "Warning: Vector too small - maybe lost solutions", con riesgo de
 % perder soluciones. Se ajusta ANTES de crear variables FD.
 % ------------------------------------------------------------
