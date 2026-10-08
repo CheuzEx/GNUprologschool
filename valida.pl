@@ -242,7 +242,7 @@ err_restriccion(excluyentes, [C1,G1,C2,G2], U, R) :- !,
     ;   R = ok
     ).
 
-% prefiere: la sesion que empieza en esa franja no puede exceder el dia.
+% La sesion que empieza en esa franja no puede exceder el dia.
 err_restriccion(prefiere, [C,G,DF,W], U, R) :- !,
     normalizar_id(C,CN), normalizar_id(G,GN),
     U = u(Dias, NF, _, _, Grupos, Durs),
