@@ -79,8 +79,7 @@ recortar_atomo(Atomo, Recortado) :-
     atom_chars(Recortado, RChars).
 
 % ---- Conversion atomo -> numero ----
-% Se evita el nombre atom_number/2, que ya esta predefinido en versiones
-% recientes de GNU Prolog.
+% No usar atom_number/2: ya esta predefinido en GNU Prolog reciente.
 atomo_numero(Atom, Number) :-
     atom_codes(Atom, Codes),
     number_codes(Number, Codes).
@@ -156,8 +155,8 @@ asertar_cada_dia([Chars|Resto]) :-
     asertar_cada_dia(Resto).
 
 % ---- Carga de la instancia ----
-% cargar_instancia/1 valida primero (valida.pl) y solo carga los hechos si
-% la instancia es coherente. cargar_instancia_sin_validar/1 es la lectura
+% cargar_instancia/1 valida primero (valida.pl) y solo carga si la
+% instancia es coherente. cargar_instancia_sin_validar/1 es la lectura
 % pura, para quien ya valido por su cuenta.
 cargar_instancia(Path) :-
     valida(Path),
