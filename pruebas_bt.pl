@@ -200,7 +200,7 @@ escribir_nota_referencia(_).
 % ------------------------------------------------------------
 escribir_csv(Ruta, Archivo, NSes, Limite, Tabla) :-
     open(Ruta, write, Out),
-    format(Out, "instancia,sesiones,limite,configuracion,resultado,nodos,retrocesos,cpu_ms,pared_ms,nodos_por_s,aceleracion,eficiencia_poda,ref_es_cota,verifica,costo,optimo~n", []),
+    format(Out, "instancia;sesiones;limite;configuracion;resultado;nodos;retrocesos;cpu_ms;pared_ms;nodos_por_s;aceleracion;eficiencia_poda;ref_es_cota;verifica;costo;optimo~n", []),
     csv_filas(Tabla, Archivo, NSes, Limite, Out),
     close(Out),
     write('CSV escrito en '), write(Ruta), nl.
@@ -210,7 +210,7 @@ csv_filas([f(Nom, Txt, N, Ret, Cpu, Real, Rate, S, E, Pref, Ok, Costo, Opt)|Fs],
           Archivo, NSes, Limite, Out) :-
     functor(Txt, TxtF, _),
     referencia_csv(Pref, Cota),
-    format(Out, "~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w,~w~n",
+    format(Out, "~w;~w;~w;~w;~w;~w;~w;~w;~w;~w;~w;~w;~w;~w;~w;~w~n",
            [Archivo, NSes, Limite, Nom, TxtF, N, Ret, Cpu, Real, Rate,
             S, E, Cota, Ok, Costo, Opt]),
     csv_filas(Fs, Archivo, NSes, Limite, Out).
