@@ -609,6 +609,3 @@ violacion(_, Celdas, excluyentes(C1, G1, C2, G2, D, F)) :-
 
 duplicado([X, Y|_], X) :- X == Y.
 duplicado([_|R], X) :- duplicado(R, X).
-
-duplicado([X, Y|_], X) :- X == Y.
-duplicado([_|R], X) :- duplicado(R, X).
